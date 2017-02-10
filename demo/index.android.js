@@ -2,29 +2,28 @@
 import React, {Component} from 'react';
 import {
     AppRegistry,
-    Navigator,
-    BackAndroid
+    StyleSheet,
+    Text,
+    View,
+    TextInput
 } from 'react-native';
 
-var RegisterLeaf = require('./RegisterLeaf');
-var WaitingLeaf = require('./WaitingLeaf');
+import ToastAndroid from './ToastAndroid';
 
-var NaviModule = React.createClass({
+let Dimensions = require('Dimensions');
+let PixelRatio = require('PixelRatio');
+let totalWidth = Dimensions.get("window").width;
+let totalHeight = Dimensions.get("window").height;
+let pixelRatio = PixelRatio.get();
 
-    configureScene: function () {
-        return Navigator.SceneConfigs.FadeAndroid;
-    },
-
-    renderScene: function (router, navigator) {
-        this._navigator = navigator;
-        switch (router.name){
-            case 'register':
-                return < RegisterLeaf navigator = {navigator}/>;
-                break;
-            case 'waiting':
-                return <WaitingLeaf phoneNumber={router.phoneNumber}/>;
-                break;
-        }
+let leftStartPoint = totalWidth * 0.1;
+let componentWidth = totalWidth * 0.8;
+let demo = React.createClass({
+    getInitialState: function () {
+        return {
+            inputNum: '',
+            inputPW: '',
+        };
     },
 
     updateNum: function (newText) {
@@ -52,6 +51,10 @@ var NaviModule = React.createClass({
         });
     },
 
+    buttonPressed: function () {
+        ToastAndroid.show('Awesome', ToastAndroid.SHORT);
+    },
+
     render: function () {
         return (
             <View style={styles.container}>
@@ -65,7 +68,8 @@ var NaviModule = React.createClass({
                            placeholder={'请输入密码'}
                            password={true}
                            onChangeText={(newText) => this.updateFW(newText)}/>
-                <Text style={styles.bigTextPrompt}>
+                <Text style={styles.bigTextPrompt}
+                      onPress={this.buttonPressed()}>
                     确定
                 </Text>
             </View>
@@ -111,4 +115,4 @@ const styles = StyleSheet.create({
 
 //AppRegistry模块则是用来告知React Native哪一个组件被注册为整个应用的根容器。
 //一般此方法只会被调用一次
-AppRegistry.registerComponent('demo', () => NaviModule);
+AppRegistry.registerComponent('demo', () => demo);

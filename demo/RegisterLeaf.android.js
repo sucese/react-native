@@ -8,6 +8,9 @@ import {
     TextInput
 } from 'react-native';
 
+var {NativeModules} = require('react-native');
+let ExampleInterface = NativeModules.ExampleInterface;
+
 let Dimensions = require('Dimensions');
 let PixelRatio = require('PixelRatio');
 let totalWidth = Dimensions.get("window").width;
@@ -49,6 +52,10 @@ let RegisterLeaf = React.createClass({
         });
     },
 
+    buttonPressed: function () {
+        NativeModules.ExampleInterface.handleMessage("I am a message for RN");
+    },
+
     render: function () {
         return (
             <View style={styles.container}>
@@ -62,7 +69,8 @@ let RegisterLeaf = React.createClass({
                            placeholder={'请输入密码'}
                            password={true}
                            onChangeText={(newText) => this.updateFW(newText)}/>
-                <Text style={styles.bigTextPrompt}>
+                <Text style={styles.bigTextPrompt}
+                      onPress={this.buttonPressed()}>
                     确定
                 </Text>
             </View>
