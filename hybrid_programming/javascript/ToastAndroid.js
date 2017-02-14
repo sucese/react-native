@@ -1,3 +1,3 @@
 'use strict';
-import {NativeModules} from 'react-native';
+import { NativeModules } from 'react-native';
 module.exports = NativeModules.ToastAndroid;
