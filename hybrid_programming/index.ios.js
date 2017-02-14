@@ -12,7 +12,7 @@ import {
   View
 } from 'react-native';
 
-export default class hybrid_progrmming extends Component {
+export default class hybrid_programming extends Component {
   render() {
     return (
       <View style={styles.container}>
@@ -20,11 +20,11 @@ export default class hybrid_progrmming extends Component {
           Welcome to React Native!
         </Text>
         <Text style={styles.instructions}>
-          To get started, edit index.android.js
+          To get started, edit index.ios.js
         </Text>
         <Text style={styles.instructions}>
-          Double tap R on your keyboard to reload,{'\n'}
-          Shake or press menu button for dev menu
+          Press Cmd+R to reload,{'\n'}
+          Cmd+D or shake for dev menu
         </Text>
       </View>
     );
@@ -50,4 +50,4 @@ const styles = StyleSheet.create({
   },
 });
 
-AppRegistry.registerComponent('hybrid_progrmming', () => hybrid_progrmming);
+AppRegistry.registerComponent('hybrid_programming', () => hybrid_programming);

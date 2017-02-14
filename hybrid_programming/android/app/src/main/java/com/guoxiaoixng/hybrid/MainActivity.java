@@ -1,4 +1,4 @@
-package com.hybrid_progrmming;
+package com.guoxiaoixng.hybrid;
 
 import com.facebook.react.ReactActivity;
 
@@ -10,6 +10,6 @@ public class MainActivity extends ReactActivity {
      */
     @Override
     protected String getMainComponentName() {
-        return "hybrid_progrmming";
+        return "hybrid_programming";
     }
 }
