@@ -1,0 +1,3 @@
+rootProject.name = 'ui_component'
+
+include ':app'
