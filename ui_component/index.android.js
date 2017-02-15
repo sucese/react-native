@@ -19,6 +19,7 @@ export default class ui_component extends Component {
                 <View style={styles.item}/>
                 <View style={styles.item}/>
                 <View style={styles.item}/>
+                <View style={styles.item}/>
                 <View style={styles.item1}/>
             </View>
         );
