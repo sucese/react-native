@@ -5,6 +5,7 @@ import com.facebook.react.bridge.JavaScriptModule;
 import com.facebook.react.bridge.NativeModule;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.uimanager.ViewManager;
+import com.guoxiaoixng.hybrid.component.ImageViewManager;
 import com.guoxiaoixng.hybrid.module.ToastModule;
 
 import java.util.ArrayList;
@@ -40,6 +41,8 @@ public class MainPackage implements ReactPackage {
 
     @Override
     public List<ViewManager> createViewManagers(ReactApplicationContext reactContext) {
-        return Collections.emptyList();
+        List<ViewManager> managers = new ArrayList<>();
+        managers.add(new ImageViewManager());
+        return managers;
     }
 }

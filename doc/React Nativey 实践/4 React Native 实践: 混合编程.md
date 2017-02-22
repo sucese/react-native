@@ -1,4 +1,4 @@
-#一 Native Modules
+# Native Modules
 
 ### 1 编写 Native Module
 
@@ -240,4 +240,136 @@ const styles = StyleSheet.create({
 
 AppRegistry.registerComponent('hybrid_programming', () => hybrid_programming);
 
+```
+
+# Native UI Components
+
+1. Create the ViewManager subclass.
+2. Implement the createViewInstance method
+3. Expose view property setters using @ReactProp (or @ReactPropGroup) annotation
+4. Register the manager in createViewManagers of the applications package.
+5. Implement the JavaScript module
+
+### Create the ViewManager subclass.
+
+```java
+package com.guoxiaoixng.hybrid.component;
+
+import android.widget.ImageView;
+
+import com.facebook.react.uimanager.SimpleViewManager;
+import com.facebook.react.uimanager.ThemedReactContext;
+import com.facebook.react.uimanager.annotations.ReactProp;
+
+/**
+ * In this example we create view manager class ImageViewManager that extends SimpleViewManager of type ReactImageView.
+ * ReactImageView is the type of object managed by the manager, this will be the custom native view. Name returned by
+ * getName is used to reference the native view type from JavaScript.
+ * <p>
+ * For more information, you can visit https://github.com/guoxiaoxing or contact me by
+ * guoxiaoxingse@gmail.com
+ *
+ * @author guoxiaoxing
+ * @since 17/2/21 下午5:04
+ */
+public class ImageViewManager extends SimpleViewManager<ImageView> {
+
+    public static final String REACT_CLASS = "RCTImageView";
+
+    @Override
+    public String getName() {
+        return REACT_CLASS;
+    }
+
+    /**
+     * Views are created in the createViewInstance method, the view should initialize itself in its default state, any
+     * properties will be set via a follow up call to updateView.
+     *
+     * @param reactContext reactContext
+     */
+
+    @Override
+    protected ImageView createViewInstance(ThemedReactContext reactContext) {
+        return new ImageView(reactContext);
+    }
+
+    @ReactProp(name = "src")
+    public void setSrc(ImageView imageView, int src) {
+        imageView.setImageResource(src);
+    }
+
+}
+```
+
+### Register the manager in createViewManagers of the applications package.
+
+```java
+package com.guoxiaoixng.hybrid;
+
+import com.facebook.react.ReactPackage;
+import com.facebook.react.bridge.JavaScriptModule;
+import com.facebook.react.bridge.NativeModule;
+import com.facebook.react.bridge.ReactApplicationContext;
+import com.facebook.react.uimanager.ViewManager;
+import com.guoxiaoixng.hybrid.component.ImageViewManager;
+import com.guoxiaoixng.hybrid.module.ToastModule;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/**
+ * For more information, you can visit https://github.com/guoxiaoxing or contact me by
+ * guoxiaoxingse@gmail.com
+ *
+ * @author guoxiaoxing
+ * @since 17/2/14 上午10:15
+ */
+public class MainPackage implements ReactPackage {
+
+    /**
+     * Register the Module; this happens in the createNativeModules of your apps package. If a module is not
+     * registered it will not be available from JavaScript.
+     *
+     * @param reactContext reactContext
+     */
+    @Override
+    public List<NativeModule> createNativeModules(ReactApplicationContext reactContext) {
+        List<NativeModule> modules = new ArrayList<>();
+        modules.add(new ToastModule(reactContext));
+        return modules;
+    }
+
+    @Override
+    public List<Class<? extends JavaScriptModule>> createJSModules() {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public List<ViewManager> createViewManagers(ReactApplicationContext reactContext) {
+        List<ViewManager> managers = new ArrayList<>();
+        managers.add(new ImageViewManager());
+        return managers;
+    }
+}
+```
+
+
+### Implement the JavaScript module
+
+```javascript
+'use strict';
+
+import {PropTypes} from 'react';
+import {requireNativeComponent, View} from 'react-native';
+
+var iface = {
+    name: 'ImageView',
+    propTypes: {
+        src: PropTypes.int,
+        ...View.propTypes
+    }
+};
+
+module.exports = requireNativeComponent('RCTImageView', iface);
 ```

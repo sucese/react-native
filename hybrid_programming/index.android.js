@@ -12,7 +12,9 @@ import {
     TouchableHighlight,
     View
 } from 'react-native';
+
 import ToastAndroid from './javascript/ToastAndroid';
+import ImageView from './javascript/ImageView'
 
 export default class hybrid_programming extends Component {
     render() {
@@ -22,6 +24,7 @@ export default class hybrid_programming extends Component {
                       onPress={ToastAndroid.show("ToastAndroid", ToastAndroid.SHORT)}>
                     Toast Android
                 </Text>
+                <ImageView src="./art/react_native_banner.png"/>
             </View>
         );
     }
