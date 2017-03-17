@@ -21,7 +21,7 @@
 
 源码地址：https://github.com/facebook/react-native
 
-源码版本：![](https://github.com/guoxiaoxing/awesome-react-native/blob/master/art/source/1/source_code_structure_1.png)
+源码版本：![](https://badge.fury.io/js/react-native.svg))
 
 本篇文章是《ReactNative源码篇》的第一篇文章，刚开始，我们先不对源码做深入的分析，我们先要对源码的结构和ReactNative的框架有个大致的印象，
 由此便引出了本篇文章需要讨论的两个问题：
