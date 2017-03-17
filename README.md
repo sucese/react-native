@@ -1,6 +1,6 @@
 # ReactNative
 
-<img src="https://github.com/guoxiaoxing/awesome-react-native/raw/master/art/react_native_banner.png" width="700"/>
+<img src="https://github.com/guoxiaoxing/awesome-react-native/raw/master/art/react_native_banner.png" width="1000"/>
 
 作者: 郭孝星<br/>
 邮箱: guoxiaoxingse@163.com<br/>
