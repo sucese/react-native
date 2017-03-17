@@ -53,10 +53,15 @@ react依赖另外几个包，它们的调用关系如下图所示：
 
 从上面对ReactNative系统框架的分析，我们很容易看出源码的主线就在于ReactNative的启动流程、UI的绘制与渲染以及双边通信（Java调用JS，JS调用Java）。
 
-源码主线：ReactNative的启动与加载流程、UI的绘制与渲染以及双边通信。
+源码主线：
 
+```
+ReactNative的启动与加载流程、UI的绘制与渲染以及双边通信。
+```
 源码支线：
 
+```
 1. ReactNative运行时的异常以及异常的捕获与处理。
 2. SOLoader加载动态链接库
 3. ReactNative触摸事件处理机制
+```
