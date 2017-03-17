@@ -24,7 +24,7 @@
 
 >本篇系列文章主要介绍ReactNative的基本组件以及一些基本用法。
 
-- [1ReactNative实践篇：环境配置与编译](https://github.com/guoxiaoxing/awesome-react-native/biob/master/doc/ReactNative基础篇/1ReactNative实践篇：环境配置与编译.md)
+- [1ReactNative实践篇：环境配置与编译](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative基础篇/1ReactNative实践篇：环境配置与编译.md)
 - 2ReactNative实践篇：基本概念
 - 3ReactNative实践篇：基本组件-View
 - 4ReactNative实践篇：基本组件-Text、TextInput与Button
