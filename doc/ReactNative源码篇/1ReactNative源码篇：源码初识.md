@@ -35,7 +35,7 @@
 
 ReactNative源码结构图
 
-<img src="https://github.com/guoxiaoxing/awesome-react-native/blob/master/art/source/1/source_code_structure_2.png"/>
+<img src="https://github.com/guoxiaoxing/awesome-react-native/raw/master/art/source/1/source_code_structure_2.png"/>
 
 - jni：ReactNative的好多机制都是由C、C++实现的，这部分便是用来载入SO库。
 - perftest：测试配置
