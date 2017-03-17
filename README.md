@@ -1,6 +1,7 @@
 # ReactNative
 
-![](/art/react_native_banner.png)
+
+<img src="https://github.com/guoxiaoxing/awesome-react-native/raw/master/art/react_native_banner.png" width="700"/>
 
 
 # 附录
