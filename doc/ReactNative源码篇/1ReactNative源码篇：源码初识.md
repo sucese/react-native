@@ -37,13 +37,13 @@ ReactNative源码结构图
 
 <img src="https://github.com/guoxiaoxing/awesome-react-native/blob/master/art/source/1/source_code_structure_2.png"/>
 
-jni：ReactNative的好多机制都是由C、C++实现的，这部分便是用来载入SO库。
-perftest：测试配置
-proguard：混淆
-quicklog：log输出
-react：ReactNative源码的主要内容，也是我们分析的主要内容。
-systrace：system trace
-yoga：瑜伽？哈哈，并不是，是facebook开源的前端布局引擎
+- jni：ReactNative的好多机制都是由C、C++实现的，这部分便是用来载入SO库。
+- perftest：测试配置
+- proguard：混淆
+- quicklog：log输出
+- react：ReactNative源码的主要内容，也是我们分析的主要内容。
+- systrace：system trace
+- yoga：瑜伽？哈哈，并不是，是facebook开源的前端布局引擎
 
 
 
