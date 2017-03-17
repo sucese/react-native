@@ -53,6 +53,8 @@
 
 ## ReactNative源码篇
 
+- [1ReactNative源码篇：源码初识](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/1ReactNative源码篇：源码初识.md)
+
 >本篇系列文章主要分析ReactNative Android部分的源码，分析ReactNative的通信原理以及调用机制。
 
 

@@ -15,7 +15,9 @@
 问题, 请描述清楚并附上代码与日志, 一般都会给予回复。如果文章中有什么错误, 也欢迎斧正。如果你觉得本文章对你有所帮助, 也欢迎去star文章, 
 关注文章的最新的动态。
 
-# 配置环境
+文章目录：https://github.com/guoxiaoxing/awesome-react-native
+
+## 配置环境
 
 Node, Watchman 
 
@@ -39,7 +41,7 @@ npm install -g react-native-cli
 
 Xcode 
 
-# 创建项目
+## 创建项目
 
 ```
 react-native init AwesomeProject
@@ -93,7 +95,7 @@ npm config set registry=http://registry.npm.taobao.org/
 
 配置完成之后，再去初始化项目，大概2分钟创建项目完毕。
 
-# 编译工程
+## 编译工程
 
 编译ios
 
