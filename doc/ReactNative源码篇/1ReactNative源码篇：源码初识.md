@@ -22,3 +22,35 @@
 源码地址：https://github.com/facebook/react-native
 
 源码版本：![](https://github.com/guoxiaoxing/awesome-react-native/blob/master/art/source/1/source_code_structure_1.svg)
+
+本篇文章是《ReactNative源码篇》的第一篇文章，刚开始，我们先不对源码做深入的分析，我们先要对源码的结构和ReactNative的框架有个大致的印象，
+由此便引出了本篇文章需要讨论的两个问题：
+
+1. ReactNative系统框架是怎样的？
+2. ReactNative系统框架的主线在哪里，有哪些支线，如何去分析这些线路？
+
+好，我们先来看第一个问题。
+
+## ReactNative系统框架概述
+
+ReactNative源码结构图
+
+<img src="https://github.com/guoxiaoxing/awesome-react-native/blob/master/art/source/1/source_code_structure_2.png"/>
+
+jni：ReactNative的好多机制都是由C、C++实现的，这部分便是用来载入SO库。
+
+perftest：测试配置
+
+proguard：混淆
+
+quicklog：log输出
+
+react：ReactNative源码的主要内容，也是我们分析的主要内容。
+
+systrace：system trace
+
+yoga：瑜伽？哈哈，并不是，是facebook开源的前端布局引擎
+
+
+
+## ReactNative系统框架主线与支线
