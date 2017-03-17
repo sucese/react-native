@@ -47,6 +47,6 @@ ReactNative源码结构图
 
 react依赖另外几个包，它们的调用关系如下图所示：
 
-<img src="https://github.com/guoxiaoxing/awesome-react-native/blob/master/art/source/1/source_code_structure_3.png" width="1000" height="500"/>
+<img src="https://github.com/guoxiaoxing/awesome-react-native/blob/master/art/source/1/source_code_structure_3.png" width="1000"/>
 
 ## ReactNative系统框架主线与支线
