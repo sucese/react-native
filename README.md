@@ -1,23 +1,62 @@
 # ReactNative
 
-
 <img src="https://github.com/guoxiaoxing/awesome-react-native/raw/master/art/react_native_banner.png" width="700"/>
 
+作者: 郭孝星<br/>
+邮箱: guoxiaoxingse@163.com<br/>
+博客: https://guoxiaoxing.github.io/<br/>
+简书: http://www.jianshu.com/users/66a47e04215b/latest_articles<br/>
 
-# 附录
+**关于作者**
+
+>郭孝星，非著名程序员，代码洁癖患者，爱编程，好吉他，喜烹饪，爱一切有趣的事物和人。
+
+**关于文章**
+
+>作者的文章会同时发布在Github、CSDN与简书上, 文章顶部也会附上文章的Github链接。如果文章中有什么疑问也欢迎发邮件与我交流, 对于交流的问
+题, 请描述清楚问题并附上代码与日志, 一般都会给予回复。如果文章中有什么错误, 也欢迎斧正。如果你觉得本文章对你有所帮助, 也欢迎去star文
+章, 关注文章的最新的动态。另外建议大家去Github上浏览文章，一方面文章的写作都是在Github上进行的，所以Github上的更新是最及时的，另一方
+面感觉Github对Markdown的支持更好，文章的渲染也更加美观。
+
+文章持续更新中。。。
+
+## ReactNative基础篇
+
+1ReactNative实践篇：环境配置与编译
+2ReactNative实践篇：基本概念
+3ReactNative实践篇：基本组件-View
+4ReactNative实践篇：基本组件-Text、TextInput与Button
+5ReactNative实践篇：基本组件-ScrollView、ListView
+6ReactNative实践篇：基本组件-MapView
+7ReactNative实践篇：基本组件-WebView
+8ReactNative实践篇：基本组件-Modal
+9ReactNative实践篇：基本组件-Navigator
+10ReactNative实践篇：基本组件-Picker
+11ReactNative实践篇：基本组件-Slider
+12ReactNative实践篇：基本组件-Switch
+13ReactNative实践篇：基本组件-Touchable系列
+14ReactNative实践篇：基本组件-DrawerLayoutAndroid
+15ReactNative实践篇：基本组件-ProgressBarAndroid
+16ReactNative实践篇：基本组件-ToolbarAndroid
+17ReactNative实践篇：基本组件-ViewPagerAndroid
+18ReactNative实践篇：网络请求
+19ReactNative实践篇：网页浏览器、音视频媒体播放
+
+## ReactNative实践篇
+
+## ReactNative源码篇
+
+
+## 附录
+
+文章最后推荐一些关于React Native的资料。
 
 https://github.com/jondot/awesome-react-native
 
 https://github.com/reactnativecn/react-native-guide
 
-## 教程资料
+fangwei716/30-days-of-react-native：https://github.com/fangwei716/30-days-of-react-native
 
-[fangwei716/30-days-of-react-native](https://github.com/fangwei716/30-days-of-react-native)
+fbsamples/f8app：https://github.com/fbsamples/f8app
 
-## 开源应用
-
-[fbsamples/f8app](https://github.com/fbsamples/f8app)
-
-构建 F8 App / React Native 开发指南 https://f8-app.liaohuqiu.net/
-
->Source code of the official F8 app of 2016, powered by React Native and other Facebook open source projects.
+构建 F8 App / React Native 开发指南：https://f8-app.liaohuqiu.net/
