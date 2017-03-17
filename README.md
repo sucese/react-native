@@ -22,7 +22,9 @@
 
 ## ReactNative基础篇
 
-- 1ReactNative实践篇：环境配置与编译
+>本篇系列文章主要介绍ReactNative的基本组件以及一些基本用法。
+
+- [1ReactNative实践篇：环境配置与编译](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/1ReactNative实践篇：环境配置与编译.md)
 - 2ReactNative实践篇：基本概念
 - 3ReactNative实践篇：基本组件-View
 - 4ReactNative实践篇：基本组件-Text、TextInput与Button
@@ -44,7 +46,14 @@
 
 ## ReactNative实践篇
 
+>本篇系列文章主要从性能优化、崩溃监测等方面进一步阐述ReactNative在生产环境下的最佳实践以及改进优化。
+
+- 1ReactNative实践篇：性能优化
+- 2ReactNative实践篇：崩溃监测
+
 ## ReactNative源码篇
+
+>本篇系列文章主要分析ReactNative Android部分的源码，分析ReactNative的通信原理以及调用机制。
 
 
 ## 附录
