@@ -53,6 +53,10 @@ react依赖另外几个包，它们的调用关系如下图所示：
 
 <img src="https://github.com/guoxiaoxing/awesome-react-native/raw/master/art/source/1/source_code_structure_3.png" width="1000"/>
 
+ReactNative系统框架图如下所示：
+
+<img src="https://github.com/guoxiaoxing/awesome-react-native/raw/master/art/source/1/react_native_system_strcuture.png" width="1000"/>
+
 ## ReactNative系统框架主线与支线
 
 从上面对ReactNative系统框架的分析，我们很容易看出源码的主线就在于ReactNative的启动流程、UI的绘制与渲染以及双边通信（Java调用JS，JS调用Java）。
