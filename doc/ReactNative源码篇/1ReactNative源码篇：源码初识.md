@@ -64,12 +64,14 @@ ReactNative系统框架图如下所示：
 源码主线：
 
 ```
-ReactNative的启动与加载流程、UI的绘制与渲染以及双边通信。
+1 ReactNative的启动与加载流程
+2 UI的绘制与渲染
+3 JS与Java的双边通信。
 ```
 源码支线：
 
 ```
-1. ReactNative运行时的异常以及异常的捕获与处理。
-2. SOLoader加载动态链接库
-3. ReactNative触摸事件处理机制
+1 ReactNative运行时的异常以及异常的捕获与处理。
+2 SOLoader加载动态链接库
+3 ReactNative触摸事件处理机制
 ```
