@@ -57,9 +57,13 @@ ReactNative系统框架图如下所示：
 
 <img src="https://github.com/guoxiaoxing/awesome-react-native/raw/master/art/source/1/react_native_system_strcuture.png" width="1000"/>
 
+>注：JSCore，即JavaScriptCore，JS解析的核心部分，IOS使用的是内置的JavaScriptCore，Androis上使用的是https://webkit.org/家的jsc.so。
+
 ## ReactNative系统框架主线与支线
 
 从上面对ReactNative系统框架的分析，我们很容易看出源码的主线就在于ReactNative的启动流程、UI的绘制与渲染以及双边通信（Java调用JS，JS调用Java）。
+
+
 
 源码主线：
 
