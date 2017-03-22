@@ -44,20 +44,22 @@
 - 18ReactNative实践篇：网络请求
 - 19ReactNative实践篇：网页浏览器、音视频媒体播放
 
+## ReactNative源码篇
+
+>本篇系列文章主要分析ReactNative Android部分的源码，分析ReactNative的通信原理以及调用机制。
+
+- [1ReactNative源码篇：源码初识](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/1ReactNative源码篇：源码初识.md)
+- ReactNative源码篇：应用启动流程
+- ReactNative源码篇：界面绘制与渲染
+- ReactNative源码篇：事件分发与处理
+- ReactNative源码篇：Java与JS双边通信原理
+
 ## ReactNative实践篇
 
 >本篇系列文章主要从性能优化、崩溃监测等方面进一步阐述ReactNative在生产环境下的最佳实践以及改进优化。
 
 - 1ReactNative实践篇：性能优化
 - 2ReactNative实践篇：崩溃监测
-
-## ReactNative源码篇
-
-- [1ReactNative源码篇：源码初识](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/1ReactNative源码篇：源码初识.md)
-- ReactNative源码篇：UI渲染原理
-- ReactNative源码篇：通信机制
-
->本篇系列文章主要分析ReactNative Android部分的源码，分析ReactNative的通信原理以及调用机制。
 
 
 ## 附录
