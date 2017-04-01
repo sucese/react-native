@@ -16,7 +16,7 @@
 star文章, 关注文章的最新的动态。另外建议大家去Github上浏览文章，一方面文章的写作都是在Github上进行的，所以Github上的更新是最及时
 的，另一方面感觉Github对Markdown的支持更好，文章的渲染也更加美观。
 
-文章目录：https://github.com/guoxiaoxing/awesome-react-native/blob/master/README.md
+文章目录：https://github.com/guoxiaoxing/react-native-android-container/blob/master/README.md
 
 源码地址：https://github.com/facebook/react-native
 
@@ -36,7 +36,7 @@ star文章, 关注文章的最新的动态。另外建议大家去Github上浏�
 
 ReactNative源码结构图
 
-<img src="https://github.com/guoxiaoxing/awesome-react-native/raw/master/art/source/1/source_code_structure_2.png"/>
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/1/source_code_structure_2.png"/>
 
 ```
 - jni：ReactNative的好多机制都是由C、C++实现的，这部分便是用来载入SO库。
@@ -50,11 +50,11 @@ ReactNative源码结构图
 
 react依赖另外几个包，它们的调用关系如下图所示：
 
-<img src="https://github.com/guoxiaoxing/awesome-react-native/raw/master/art/source/1/source_code_structure_3.png" width="1000"/>
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/1/source_code_structure_3.png" width="1000"/>
 
 ReactNative系统框架图如下所示：
 
-<img src="https://github.com/guoxiaoxing/awesome-react-native/raw/master/art/source/1/react_native_system_strcuture.png" width="1000"/>
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/1/react_native_system_strcuture.png" width="1000"/>
 
 >注：JSCore，即JavaScriptCore，JS解析的核心部分，IOS使用的是内置的JavaScriptCore，Androis上使用的是https://webkit.org/家的jsc.so。
 
