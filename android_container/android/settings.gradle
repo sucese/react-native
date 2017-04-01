@@ -1,0 +1,3 @@
+rootProject.name = 'android_container'
+
+include ':app', ':container'
