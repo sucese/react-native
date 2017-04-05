@@ -4,50 +4,119 @@
  * @flow
  */
 
-import React, { Component } from 'react';
+import React, {Component} from 'react';
 import {
-  AppRegistry,
-  StyleSheet,
-  Text,
-  View
+    AppRegistry,
+    StyleSheet,
+    Text,
+    View,
+    ScrollView,
+    RefreshControl,
+    Button,
 } from 'react-native';
 
 export default class android_container extends Component {
-  render() {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.welcome}>
-          Welcome to React Native!
-        </Text>
-        <Text style={styles.instructions}>
-          To get started, edit index.android.js
-        </Text>
-        <Text style={styles.instructions}>
-          Double tap R on your keyboard to reload,{'\n'}
-          Shake or press menu button for dev menu
-        </Text>
-      </View>
-    );
-  }
+
+    onPressView() {
+
+    }
+
+    onPressButton() {
+
+    }
+
+    onRefresh(){
+
+    }
+
+    render() {
+        return (
+            <View style={styles.container}
+            ani>
+                <ScrollView
+                    style={styles.scrollview}
+                    refreshControl={
+                        <RefreshControl
+                            onRefresh={this.onRefresh()}
+                            refreshing={false}
+                            title='正在加载中...'
+                            tintColor='#FF0000'
+                            colors={['#FF0000', '#00FF00', '#0000FF']}
+                            progressBackgroundColor="#FFFF00"/>
+                    }>
+
+                    <View style={styles.button}>
+                        <Button
+                            title='View'
+                            onPress={this.onPressView}/>
+                    </View>
+
+                    <View style={styles.button}>
+                        <Button
+                            title='Image'
+                            onPress={this.onPressButton}/>
+                    </View>
+
+                    <View style={styles.button}>
+                        <Button
+                            title='View'
+                            onPress={this.onPressButton}/>
+                    </View>
+
+                    <View style={styles.button}>
+                        <Button
+                            title='View'
+                            onPress={this.onPressButton}/>
+                    </View>
+
+                    <View style={styles.button}>
+                        <Button
+                            title='View'
+                            onPress={this.onPressButton}/>
+                    </View>
+
+                    <View style={styles.button}>
+                        <Button
+                            title='View'
+                            onPress={this.onPressButton}/>
+                    </View>
+
+                    <View style={styles.button}>
+                        <Button
+                            title='View'
+                            onPress={this.onPressButton}/>
+                    </View>
+
+                    <View style={styles.button}>
+                        <Button
+                            title='View'
+                            onPress={this.onPressButton}/>
+                    </View>
+                </ScrollView>
+            </View>
+        );
+    }
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F5FCFF',
-  },
-  welcome: {
-    fontSize: 20,
-    textAlign: 'center',
-    margin: 10,
-  },
-  instructions: {
-    textAlign: 'center',
-    color: '#333333',
-    marginBottom: 5,
-  },
+    container: {
+        flex: 1,
+        backgroundColor: '#F5FCFF',
+    },
+    scrollview: {
+        backgroundColor: '#F5FCFF'
+    },
+    button: {
+        borderRadius: 10,
+        padding: 10,
+        shadowColor: '#000000',
+        shadowOffset: {
+            width: 0,
+            height: 3
+        },
+        shadowRadius: 10,
+        shadowOpacity: 0.25,
+    }
 });
 
 AppRegistry.registerComponent('android_container', () => android_container);
