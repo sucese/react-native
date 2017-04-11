@@ -23,7 +23,15 @@ star文章, 关注文章的最新的动态。另外建议大家去Github上浏�
 
 ```
 ReactInstanceManager：创建ReactContext、CatalystInstance等类，解析ReactPackage生成注册表，并且配合ReactRootView管理View的创建与生命周期等功能。
-React
+ReactContext：继承于ContextWrapper，是Rn应用的上下文，可以通过getContext()去获得。
+ReactRootView：Rn应用的根视图。
+ReactBridge：通信的核心类，通过JNI方式进行调用，C++层作为通信中间层。
+NativeModuleRegistry：Java Module注册表。
+JavascriptModuleRegistry：JS Module注册表。
+CoreModulePackage：RN核心框架Package，包括Java接口与JS接口。
+MainReactPackage：Rn封装的一些通用的Java组件与事件。
+JSBundleLoader：用于加载JSBundle的类，根据不同的情况会创建不同的Loader。
+JSBundle：JS代码包，存放JS核心逻辑。
 ```
 
 
@@ -556,3 +564,153 @@ public class CatalystInstanceImpl implements CatalystInstance {
 
 5 最后通过CatalystInstanceImpl中的ReactBridge将java的注册表通过jni传输到了JS层。
 ```
+
+## Java调用JS
+
+通过上述注册表的创建过程我们可以得知，创建过程是在ReactContextInitAsyncTask.doInBackground()里开始的，我们来看看doInBackground()执行完成之后，onPostExecute()的实现：
+
+
+```java
+public class ReactInstanceManager {
+
+ /*
+   * Task class responsible for (re)creating react context in the background. These tasks can only
+   * be executing one at time, see {@link #recreateReactContextInBackground()}.
+   */
+  private final class ReactContextInitAsyncTask extends
+      AsyncTask<ReactContextInitParams, Void, Result<ReactApplicationContext>> {
+
+    @Override
+    protected void onPostExecute(Result<ReactApplicationContext> result) {
+      try {
+        setupReactContext(result.get());
+      } catch (Exception e) {
+        mDevSupportManager.handleException(e);
+      } finally {
+        mReactContextInitAsyncTask = null;
+      }
+
+      // Handle enqueued request to re-initialize react context.
+      if (mPendingReactContextInitParams != null) {
+        recreateReactContextInBackground(
+            mPendingReactContextInitParams.getJsExecutorFactory(),
+            mPendingReactContextInitParams.getJsBundleLoader());
+        mPendingReactContextInitParams = null;
+      }
+    }
+}
+```
+
+doInBackground()做完事情之后，onPostExecute()会去调用ReactInstanceManager.setupReactContext()，它的实现如下所示：
+
+```java
+public class ReactInstanceManager {
+
+  private void setupReactContext(ReactApplicationContext reactContext) {
+    ReactMarker.logMarker(SETUP_REACT_CONTEXT_START);
+    Systrace.beginSection(TRACE_TAG_REACT_JAVA_BRIDGE, "setupReactContext");
+    UiThreadUtil.assertOnUiThread();
+    Assertions.assertCondition(mCurrentReactContext == null);
+    mCurrentReactContext = Assertions.assertNotNull(reactContext);
+    CatalystInstance catalystInstance =
+        Assertions.assertNotNull(reactContext.getCatalystInstance());
+
+    catalystInstance.initialize();
+    mDevSupportManager.onNewReactContextCreated(reactContext);
+    mMemoryPressureRouter.addMemoryPressureListener(catalystInstance);
+    moveReactContextToCurrentLifecycleState();
+
+    for (ReactRootView rootView : mAttachedRootViews) {
+      attachMeasuredRootViewToInstance(rootView, catalystInstance);
+    }
+
+    ReactInstanceEventListener[] listeners =
+      new ReactInstanceEventListener[mReactInstanceEventListeners.size()];
+    listeners = mReactInstanceEventListeners.toArray(listeners);
+
+    for (ReactInstanceEventListener listener : listeners) {
+      listener.onReactContextInitialized(reactContext);
+    }
+    Systrace.endSection(TRACE_TAG_REACT_JAVA_BRIDGE);
+    ReactMarker.logMarker(SETUP_REACT_CONTEXT_END);
+  }
+
+
+  private void attachMeasuredRootViewToInstance(
+      ReactRootView rootView,
+      CatalystInstance catalystInstance) {
+    Systrace.beginSection(TRACE_TAG_REACT_JAVA_BRIDGE, "attachMeasuredRootViewToInstance");
+    UiThreadUtil.assertOnUiThread();
+
+    // Reset view content as it's going to be populated by the application content from JS
+    rootView.removeAllViews();
+    rootView.setId(View.NO_ID);
+
+    UIManagerModule uiManagerModule = catalystInstance.getNativeModule(UIManagerModule.class);
+    int rootTag = uiManagerModule.addMeasuredRootView(rootView);
+    rootView.setRootViewTag(rootTag);
+    @Nullable Bundle launchOptions = rootView.getLaunchOptions();
+    WritableMap initialProps = Arguments.makeNativeMap(launchOptions);
+    String jsAppModuleName = rootView.getJSModuleName();
+
+    WritableNativeMap appParams = new WritableNativeMap();
+    appParams.putDouble("rootTag", rootTag);
+    appParams.putMap("initialProps", initialProps);
+    //获取JS Module
+    catalystInstance.getJSModule(AppRegistry.class).runApplication(jsAppModuleName, appParams);
+    rootView.onAttachedToReactInstance();
+    Systrace.endSection(TRACE_TAG_REACT_JAVA_BRIDGE);
+  }
+}
+
+```
+ReactInstanceManager.setupReactContext()会去调用ReactInstanceManager.attachMeasuredRootViewToInstance()方法，在ttachMeasuredRootViewToInstance()方法里
+会调用CatalystInstanceImpl.getJSModule()方法，CatalystInstanceImpl.getJSModule()会去调用JavaScriptModuleRegistry.getJavaScriptModule()方法，从注册表中获取
+对应的Module。
+
+
+它的实现如下所示：
+
+```java
+public class JavaScriptModuleRegistry {
+
+  public synchronized <T extends JavaScriptModule> T getJavaScriptModule(
+    CatalystInstance instance,
+    ExecutorToken executorToken,
+    Class<T> moduleInterface) {
+    HashMap<Class<? extends JavaScriptModule>, JavaScriptModule> instancesForContext =
+        mModuleInstances.get(executorToken);
+    if (instancesForContext == null) {
+      instancesForContext = new HashMap<>();
+      mModuleInstances.put(executorToken, instancesForContext);
+    }
+
+    JavaScriptModule module = instancesForContext.get(moduleInterface);
+    if (module != null) {
+      return (T) module;
+    }
+
+    JavaScriptModuleRegistration registration =
+        Assertions.assertNotNull(
+            mModuleRegistrations.get(moduleInterface),
+            "JS module " + moduleInterface.getSimpleName() + " hasn't been registered!");
+    JavaScriptModule interfaceProxy = (JavaScriptModule) Proxy.newProxyInstance(
+        moduleInterface.getClassLoader(),
+        new Class[]{moduleInterface},
+        new JavaScriptModuleInvocationHandler(executorToken, instance, registration));
+    instancesForContext.put(moduleInterface, interfaceProxy);
+    return (T) interfaceProxy;
+  }
+
+
+}
+```
+
+
+
+
+
+## JS调用Java
+
+
+
