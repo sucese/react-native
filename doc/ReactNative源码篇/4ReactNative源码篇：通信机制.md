@@ -98,4 +98,4 @@ public abstract class ReactNativeHost {
 
 如下所示：
 
-<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/4/ClusterCallButterfly-react-ReactActivity.png"/>
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/4/ClusterCallButterfly-react-ReactActivity.png" width="1000"/>
