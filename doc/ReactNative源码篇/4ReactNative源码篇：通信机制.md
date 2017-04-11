@@ -26,6 +26,7 @@ RN的两端通信依赖一张通信表，Java端与JS端各自持有一张表，
 ```java
 public class MainApplication extends Application implements ReactApplication {
 
+  //实例化ReactNativeHost，并实现了它的抽象方法getUseDeveloperSupport()与getPackages() 
   private final ReactNativeHost mReactNativeHost = new ReactNativeHost(this) {
     @Override
     public boolean getUseDeveloperSupport() {
@@ -53,3 +54,48 @@ public class MainApplication extends Application implements ReactApplication {
 }
 
 ```
+
+>ReactNativeHost是
+
+上述代码中实例化ReactNativeHost，并实现了它的抽象方法getPackages()，该方法返回一些ReactPackage，这些ReactPackage定义了基础的组件与事件。我们自定义组件时，通常也要自己写
+一个package，注册表就是通过这些package生成的。
+
+ReactInstanceManager也持有ReactNativeManager的实例，它的代码里有一段创建ReactNaiveManager的方法：
+
+```java
+public abstract class ReactNativeHost {
+
+  protected ReactInstanceManager createReactInstanceManager() {
+    ReactInstanceManagerBuilder builder = ReactInstanceManager.builder()
+      .setApplication(mApplication)
+      .setJSMainModuleName(getJSMainModuleName())
+      .setUseDeveloperSupport(getUseDeveloperSupport())
+      .setRedBoxHandler(getRedBoxHandler())
+      .setUIImplementationProvider(getUIImplementationProvider())
+      .setInitialLifecycleState(LifecycleState.BEFORE_CREATE);
+
+    for (ReactPackage reactPackage : getPackages()) {
+      builder.addPackage(reactPackage);
+    }
+
+    String jsBundleFile = getJSBundleFile();
+    if (jsBundleFile != null) {
+      builder.setJSBundleFile(jsBundleFile);
+    } else {
+      builder.setBundleAssetName(Assertions.assertNotNull(getBundleAssetName()));
+    }
+    return builder.build();
+  }
+  
+}
+```
+
+可以看出，ReactInstanceManagerBuilder通过builder模式来创建ReactInstanceManager，配置Application、JSMainModuleName与ReactPackage等信息。builder.build()最后返回的
+是一个ReactNativeManagerImpl的实例。
+
+
+我们知道RN的页面都是继承ReactActivity来实现的，ReactActivity继承于Activity，并实现了它的生命周期方法。ReactActivity自己并没有做什么事情，所有的功能都由它的代理类ReactActivityDelegate来完成。
+
+如下所示：
+
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/4/ClusterCallButterfly-react-ReactActivity.png"/>
