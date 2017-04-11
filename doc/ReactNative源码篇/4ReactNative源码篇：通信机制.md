@@ -98,4 +98,183 @@ public abstract class ReactNativeHost {
 
 如下所示：
 
-<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/4/ClusterCallButterfly-react-ReactActivity.png" width="1000"/>
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/4/ClusterCallButterfly-react-ReactActivity.png"/>
+
+所以我们主要来关注ReactActivityDelegate的实现。
+
+我们先看看ReactActivityDelegate的创建流程，即它的onCreate()方法：
+
+```java
+public class ReactActivityDelegate {
+
+  protected void onCreate(Bundle savedInstanceState) {
+    boolean needsOverlayPermission = false;
+    //开发模式判断以及权限检查
+    if (getReactNativeHost().getUseDeveloperSupport() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+      // Get permission to show redbox in dev builds.
+      if (!Settings.canDrawOverlays(getContext())) {
+        needsOverlayPermission = true;
+        Intent serviceIntent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getContext().getPackageName()));
+        FLog.w(ReactConstants.TAG, REDBOX_PERMISSION_MESSAGE);
+        Toast.makeText(getContext(), REDBOX_PERMISSION_MESSAGE, Toast.LENGTH_LONG).show();
+        ((Activity) getContext()).startActivityForResult(serviceIntent, REQUEST_OVERLAY_PERMISSION_CODE);
+      }
+    }
+
+    if (mMainComponentName != null && !needsOverlayPermission) {
+        //载入app页面
+      loadApp(mMainComponentName);
+    }
+    mDoubleTapReloadRecognizer = new DoubleTapReloadRecognizer();
+  }
+
+  protected void loadApp(String appKey) {
+    if (mReactRootView != null) {
+      throw new IllegalStateException("Cannot loadApp while app is already running.");
+    }
+    //创建ReactRootView作为根视图
+    mReactRootView = createRootView();
+    //启动RN应用
+    mReactRootView.startReactApplication(
+      getReactNativeHost().getReactInstanceManager(),
+      appKey,
+      getLaunchOptions());
+    //Activity的setContentView()方法  
+    getPlainActivity().setContentView(mReactRootView);
+  }
+}
+```
+
+在ReactActivityDelegate.onCreate()方法里，ReactActivityDelegate做了开发模式的判断以及一些权限检查，创建ReactRootView作为应用根视图，并调用ReactRootView.startReactApplication()方法启动RN应用。我们
+接着来看startReactApplication()的实现。
+
+```java
+public class ReactRootView extends SizeMonitoringFrameLayout implements RootView {
+
+  /**
+   * Schedule rendering of the react component rendered by the JS application from the given JS
+   * module (@{param moduleName}) using provided {@param reactInstanceManager} to attach to the
+   * JS context of that manager. Extra parameter {@param launchOptions} can be used to pass initial
+   * properties for the react component.
+   */
+  public void startReactApplication(
+      ReactInstanceManager reactInstanceManager,
+      String moduleName,
+      @Nullable Bundle launchOptions) {
+    UiThreadUtil.assertOnUiThread();
+
+    // TODO(6788889): Use POJO instead of bundle here, apparently we can't just use WritableMap
+    // here as it may be deallocated in native after passing via JNI bridge, but we want to reuse
+    // it in the case of re-creating the catalyst instance
+    Assertions.assertCondition(
+        mReactInstanceManager == null,
+        "This root view has already been attached to a catalyst instance manager");
+
+    mReactInstanceManager = reactInstanceManager;
+    mJSModuleName = moduleName;
+    mLaunchOptions = launchOptions;
+
+    //创建RN应用上下文
+    if (!mReactInstanceManager.hasStartedCreatingInitialContext()) {
+      mReactInstanceManager.createReactContextInBackground();
+    }
+
+    // We need to wait for the initial onMeasure, if this view has not yet been measured, we set which
+    // will make this view startReactApplication itself to instance manager once onMeasure is called.
+    if (mWasMeasured) {
+      attachToReactInstanceManager();
+    }
+  }
+
+}
+```
+
+ReactRootView.startReactApplication()方法里最终会调用ReactInstanceManager.createReactContextInBackground()去执行ReactContext的创建。
+
+```java
+public class ReactInstanceManager {
+
+ /**
+   * Trigger react context initialization asynchronously in a background async task. This enables
+   * applications to pre-load the application JS, and execute global code before
+   * {@link ReactRootView} is available and measured. This should only be called the first time the
+   * application is set up, which is enforced to keep developers from accidentally creating their
+   * application multiple times without realizing it.
+   *
+   * Called from UI thread.
+   */
+  public void createReactContextInBackground() {
+    Assertions.assertCondition(
+        !mHasStartedCreatingInitialContext,
+        "createReactContextInBackground should only be called when creating the react " +
+            "application for the first time. When reloading JS, e.g. from a new file, explicitly" +
+            "use recreateReactContextInBackground");
+
+    mHasStartedCreatingInitialContext = true;
+    recreateReactContextInBackgroundInner();
+  }
+
+  /**
+   * Recreate the react application and context. This should be called if configuration has
+   * changed or the developer has requested the app to be reloaded. It should only be called after
+   * an initial call to createReactContextInBackground.
+   *
+   * Called from UI thread.
+   */
+  public void recreateReactContextInBackground() {
+    Assertions.assertCondition(
+        mHasStartedCreatingInitialContext,
+        "recreateReactContextInBackground should only be called after the initial " +
+            "createReactContextInBackground call.");
+    recreateReactContextInBackgroundInner();
+  }
+
+  private void recreateReactContextInBackgroundInner() {
+    UiThreadUtil.assertOnUiThread();
+
+    if (mUseDeveloperSupport && mJSMainModuleName != null) {
+      final DeveloperSettings devSettings = mDevSupportManager.getDevSettings();
+
+      // If remote JS debugging is enabled, load from dev server.
+      if (mDevSupportManager.hasUpToDateJSBundleInCache() &&
+          !devSettings.isRemoteJSDebugEnabled()) {
+        // If there is a up-to-date bundle downloaded from server,
+        // with remote JS debugging disabled, always use that.
+        onJSBundleLoadedFromServer();
+      } else if (mBundleLoader == null) {
+        mDevSupportManager.handleReloadJS();
+      } else {
+        mDevSupportManager.isPackagerRunning(
+            new PackagerStatusCallback() {
+              @Override
+              public void onPackagerStatusFetched(final boolean packagerIsRunning) {
+                UiThreadUtil.runOnUiThread(
+                    new Runnable() {
+                      @Override
+                      public void run() {
+                        if (packagerIsRunning) {
+                          mDevSupportManager.handleReloadJS();
+                        } else {
+                          // If dev server is down, disable the remote JS debugging.
+                          devSettings.setRemoteJSDebugEnabled(false);
+                          recreateReactContextInBackgroundFromBundleLoader();
+                        }
+                      }
+                    });
+              }
+            });
+      }
+      return;
+    }
+
+    recreateReactContextInBackgroundFromBundleLoader();
+  }
+
+  private void recreateReactContextInBackgroundFromBundleLoader() {
+    recreateReactContextInBackground(
+        new JSCJavaScriptExecutor.Factory(mJSCConfig.getConfigMap()),
+        mBundleLoader);
+  }
+
+}
+```
