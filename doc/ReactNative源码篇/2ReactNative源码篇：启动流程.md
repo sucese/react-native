@@ -25,7 +25,7 @@ ReactNativeHost：持有ReactInstanceManager实例，做一些初始化操作。
 
 SoLoader：加载C++底层库，准备解析JS。
 
-```
+```java
   private final ReactNativeHost mReactNativeHost = new ReactNativeHost(this) {
     @Override
     public boolean getUseDeveloperSupport() {
@@ -139,7 +139,7 @@ ReactRootView
 
 ReactInstanceManager
 
->ReactInstanceManager，JS Application实例的管理器，构建了JS Application的运行环境，发送事件给JS，驱动JS Application的运转，它与
+>ReactInstanceManagerp，JS Application实例的管理器，构建了JS Application的运行环境，发送事件给JS，驱动JS Application的运转，它与
 ReactRootView所在的Activity有着相同的生命周期，通过Builder还可以配置不同的React环境，比如内置JS路径，开发环境支持，是否支持调试，为开
 发者连接了DevSupport。
 

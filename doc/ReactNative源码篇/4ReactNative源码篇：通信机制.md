@@ -16,7 +16,7 @@ star文章, 关注文章的最新的动态。另外建议大家去Github上浏�
 
 文章目录：https://github.com/guoxiaoxing/react-native-android-container/blob/master/README.md
 
->通信，指的是RN中Java与JS的通信，即JS中的JSX代码如何转化成Java层真实的View与事件的，以及Java层又是如何调用JS来找出它需要的View与
+>通信，指的是RN中Java与JS的通信，即JS中的JSX代码如何转化成Java层真实的View与事件的，以及JavaFile层又是如何调用JS来找出它需要的View与
 事件的。
 
 在正式介绍通信流程之前，我们先来看看整个流程中牵扯到的各个类的作用。
@@ -110,13 +110,16 @@ public abstract class ReactNativeHost {
 是一个ReactNativeManagerImpl的实例。
 
 
-我们知道RN的页面都是继承ReactActivity来实现的，ReactActivity继承于Activity，并实现了它的生命周期方法。ReactActivity自己并没有做什么事情，所有的功能都由它的代理类ReactActivityDelegate来完成。
+我们知道RN的页面都是继承ReactActivity来实现的，ReactActivity继承于Activity，并实现了它的生命周期方法。ReactActivity自己并没有做什么事情，所有的功能都由它的委托类ReactActivityDelegate来完成。
 
 如下所示：
 
 <img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/4/ClusterCallButterfly-react-ReactActivity.png"/>
 
 所以我们主要来关注ReactActivityDelegate的实现。
+
+
+### ReactActivityDelegat.onCreate()
 
 我们先看看ReactActivityDelegate的创建流程，即它的onCreate()方法：
 
@@ -164,6 +167,8 @@ public class ReactActivityDelegate {
 在ReactActivityDelegate.onCreate()方法里，ReactActivityDelegate做了开发模式的判断以及一些权限检查，创建ReactRootView作为应用根视图，并调用ReactRootView.startReactApplication()方法启动RN应用。我们
 接着来看startReactApplication()的实现。
 
+### ReactRootView.startReactApplication()
+
 ```java
 public class ReactRootView extends SizeMonitoringFrameLayout implements RootView {
 
@@ -206,6 +211,8 @@ public class ReactRootView extends SizeMonitoringFrameLayout implements RootView
 ```
 
 ReactRootView.startReactApplication()方法里最终会调用ReactInstanceManager.createReactContextInBackground()去执行ReactApplicationContext的创建。
+
+### ReactInstanceManager.createReactContextInBackground()
 
 ```java
 public class ReactInstanceManager {
@@ -302,6 +309,7 @@ ReactInstanceManager.createReactContextInBackground()最终会调用ReactInstanc
 ```
 1 判断是否处于开发模式，如果处于开发模式则从Deve Server获取JSBundle，否则则从文件中获取。
 ```
+### ReactInstanceManager.onJSBundleLoadedFromServer() 
 
 我们先来看看从Dev Server获取JSBundle的情况。
 
@@ -323,6 +331,7 @@ public class ReactInstanceManager {
 JSBundleLoader.createCachedBundleFromNetworkLoader()创建JSBundleLoader，在JSBundleLoader这个类里还有很多其他方法，比如如果不是开发模式，则会调用
 JSBundleLoader.createFileLoader()，它会从文件中加载JSBundle。我们再来看看recreateReactContextInBackground()的实现。
 
+### ReactInstanceManager.recreateReactContextInBackground()
 
 ```java
 public class ReactInstanceManager {
@@ -349,6 +358,7 @@ public class ReactInstanceManager {
 
 该方法启动了一个ReactContextInitAsyncTask的异步任务去执行ReactApplicationContext的创建。
 
+### ReactInstanceManager.ReactContextInitAsyncTask
 
 ```java
 public class ReactInstanceManager {
@@ -380,6 +390,8 @@ public class ReactInstanceManager {
 }
 ```
 ReactContextInitAsyncTask的doInBackground()方法里调用ReactInstanceManager.createReactContext()最终执行了ReactApplicationContext的创建。
+
+### ReactInstanceManager.createReactContext()
 
 ```java
 public class ReactInstanceManager {
@@ -502,6 +514,8 @@ public class ReactInstanceManager {
 
 从上面的方法可以看出，在方法的最后会去创建一个CatalystInstanceImpl实例，我们来看看CatalystInstanceImpl是如何被创建的。
 
+### CatalystInstanceImpl.CatalystInstanceImpl()
+
 ```java
 public class CatalystInstanceImpl implements CatalystInstance {
 
@@ -567,8 +581,18 @@ public class CatalystInstanceImpl implements CatalystInstance {
 
 ## Java调用JS
 
+Java端要调用的JS端的类与方法，都需要注册到JS注册表中，然后进行调用，整个流程如下所示：
+
+
+```
+1 调用CatalystInstanceImpl.getJSmodule()->JavaScriptModuleRegistry.getJavaScriptModule()从注册表中获取对应的JSModule。
+2 通过动态代理拿到方法的各种参数，包括moduleID、methodID与params。
+3 将调用的方法与参数通过C层传递JS层，完成调用。
+```
+
 通过上述注册表的创建过程我们可以得知，创建过程是在ReactContextInitAsyncTask.doInBackground()里开始的，我们来看看doInBackground()执行完成之后，onPostExecute()的实现：
 
+### ReactInstanceManager.ReactContextInitAsyncTask.onPostExecute()
 
 ```java
 public class ReactInstanceManager {
@@ -602,6 +626,8 @@ public class ReactInstanceManager {
 ```
 
 doInBackground()做完事情之后，onPostExecute()会去调用ReactInstanceManager.setupReactContext()，它的实现如下所示：
+
+### ReactInstanceManager.setupReactContext()
 
 ```java
 public class ReactInstanceManager {
@@ -668,6 +694,7 @@ ReactInstanceManager.setupReactContext()会去调用ReactInstanceManager.attachM
 会调用CatalystInstanceImpl.getJSModule()方法，CatalystInstanceImpl.getJSModule()会去调用JavaScriptModuleRegistry.getJavaScriptModule()方法，从注册表中获取
 对应的Module。
 
+### JavaScriptModuleRegistry.getJavaScriptModule()
 
 它的实现如下所示：
 
@@ -701,16 +728,219 @@ public class JavaScriptModuleRegistry {
     instancesForContext.put(moduleInterface, interfaceProxy);
     return (T) interfaceProxy;
   }
+}
+```
 
+JavaScriptModuleRegistry.getJavaScriptModule()先去缓存中找JavaScriptModule，如果找到，直接返回。如果没有找到，用动态代理的方式重新创建JavaScriptModule。
+
+我们再来看看JavaScriptModuleRegistry的内部类，它用来调用JavaScriptModule。
+
+### JavaScriptModuleRegistry.JavaScriptModuleInvocationHandler.invoke()
+
+```java
+public class JavaScriptModuleRegistry {
+
+  private static class JavaScriptModuleInvocationHandler implements InvocationHandler {
+
+    private final WeakReference<ExecutorToken> mExecutorToken;
+    private final CatalystInstance mCatalystInstance;
+    private final JavaScriptModuleRegistration mModuleRegistration;
+
+    public JavaScriptModuleInvocationHandler(
+        ExecutorToken executorToken,
+        CatalystInstance catalystInstance,
+        JavaScriptModuleRegistration moduleRegistration) {
+      mExecutorToken = new WeakReference<>(executorToken);
+      mCatalystInstance = catalystInstance;
+      mModuleRegistration = moduleRegistration;
+    }
+
+    @Override
+    public @Nullable Object invoke(Object proxy, Method method, @Nullable Object[] args) throws Throwable {
+      ExecutorToken executorToken = mExecutorToken.get();
+      if (executorToken == null) {
+        FLog.w(ReactConstants.TAG, "Dropping JS call, ExecutorToken went away...");
+        return null;
+      }
+      NativeArray jsArgs = args != null ? Arguments.fromJavaArgs(args) : new WritableNativeArray();
+      mCatalystInstance.callFunction(
+        executorToken,
+        mModuleRegistration.getName(),
+        method.getName(),
+        jsArgs
+      );
+      return null;
+    }
+  }
+    
+}
+```
+
+JavaScriptModuleInvocationHandler.invoke()方法获取了moduleID，methodID，最终调用CatalystInstanceImpl.callFunction();
+
+### CatalystInstanceImpl.callFunction();
+
+```java
+
+public class CatalystInstanceImpl{
+
+  @Override
+  public void callFunction(
+      ExecutorToken executorToken,
+      final String module,
+      final String method,
+      final NativeArray arguments) {
+    if (mDestroyed) {
+      FLog.w(ReactConstants.TAG, "Calling JS function after bridge has been destroyed.");
+      return;
+    }
+    if (!mAcceptCalls) {
+      // Most of the time the instance is initialized and we don't need to acquire the lock
+      synchronized (mJSCallsPendingInitLock) {
+        if (!mAcceptCalls) {
+          mJSCallsPendingInit.add(new PendingJSCall(executorToken, module, method, arguments));
+          return;
+        }
+      }
+    }
+
+    jniCallJSFunction(executorToken, module, method, arguments);
+  }
+
+  private native void jniCallJSCallback(ExecutorToken executorToken, int callbackID, NativeArray arguments);
+}
+```
+CatalystInstanceImpl.jniCallJSCallback()将对应的moduledID, methodID和arguments通过JNI传递到JS端进行调用，JS层调用AppRegistry.runApplication()开始运行整个JS程序。
+
+## JS调用Java
+
+JS在调用Java并不是通过接口来进行的，而是对应的参数moduleID、methodID都push到一个messageQueue中，等待Java层的事件来驱动它，当Java层的事件传递过来以后，JS层把messageQUeue中的所有数据返回到Java层，再通过注册表JavaRegistry去
+调用方法。
+
+我们先来看一下大致的流程：
+
+```
+1 JS将方法的对应参数push到MessageQueue中， 等待Java端的事件传递。
+2 Java端事件触发之后，JS层将MessageQueue中的数据通过C层传递到Java层。
+3 C层调用一开始注册在其中的NativeModulesReactCallback。
+4 然后通过JavaRegistry拿到对应的module与method。
+5 通过反射执行方法。
+```
+
+
+### 
+
+Libraries/BatcherBridge/MessageQueue.js
+
+```javascript
+
+class MessageQueue {
+
+ enqueueNativeCall(moduleID: number, methodID: number, params: Array<any>, onFail: ?Function, onSucc: ?Function) {
+    if (onFail || onSucc) {
+      if (__DEV__) {
+        const callId = this._callbackID >> 1;
+        this._debugInfo[callId] = [moduleID, methodID];
+        if (callId > DEBUG_INFO_LIMIT) {
+          delete this._debugInfo[callId - DEBUG_INFO_LIMIT];
+        }
+      }
+      onFail && params.push(this._callbackID);
+      /* $FlowFixMe(>=0.38.0 site=react_native_fb,react_native_oss) - Flow error
+       * detected during the deployment of v0.38.0. To see the error, remove
+       * this comment and run flow */
+      this._callbacks[this._callbackID++] = onFail;
+      onSucc && params.push(this._callbackID);
+      /* $FlowFixMe(>=0.38.0 site=react_native_fb,react_native_oss) - Flow error
+       * detected during the deployment of v0.38.0. To see the error, remove
+       * this comment and run flow */
+      this._callbacks[this._callbackID++] = onSucc;
+    }
+
+    if (__DEV__) {
+      global.nativeTraceBeginAsyncFlow &&
+        global.nativeTraceBeginAsyncFlow(TRACE_TAG_REACT_APPS, 'native', this._callID);
+    }
+    this._callID++;
+
+    this._queue[MODULE_IDS].push(moduleID);
+    this._queue[METHOD_IDS].push(methodID);
+
+    if (__DEV__) {
+      // Any params sent over the bridge should be encodable as JSON
+      JSON.stringify(params);
+
+      // The params object should not be mutated after being queued
+      deepFreezeAndThrowOnMutationInDev((params:any));
+    }
+    this._queue[PARAMS].push(params);
+
+    const now = new Date().getTime();
+    if (global.nativeFlushQueueImmediate &&
+        now - this._lastFlush >= MIN_TIME_BETWEEN_FLUSHES_MS) {
+      global.nativeFlushQueueImmediate(this._queue);
+      this._queue = [[], [], [], this._callID];
+      this._lastFlush = now;
+    }
+    Systrace.counterEvent('pending_js_to_native_queue', this._queue[0].length);
+    if (__DEV__ && this.__spy && isFinite(moduleID)) {
+      this.__spy(
+        { type: TO_NATIVE,
+          module: this._remoteModuleTable[moduleID],
+          method: this._remoteMethodTable[moduleID][methodID],
+          args: params }
+      );
+    } else if (this.__spy) {
+      this.__spy({type: TO_NATIVE, module: moduleID + '', method: methodID, args: params});
+    }
+  }
+
+}
+```
+###
+
+Java层的事件驱动也可以额看成Java层与JS层的通信，最终会调用MessageQueue.callFunctionReturnFlushedQueue()方法。
+
+Libraries/BatcherBridge/MessageQueue.js
+
+```javascript
+
+class MessageQueue {
+
+  callFunctionReturnFlushedQueue(module: string, method: string, args: Array<any>) {
+    guard(() => {
+      this.__callFunction(module, method, args);
+      this.__callImmediates();
+    });
+
+    return this.flushedQueue();
+  }
 
 }
 ```
 
+然后调用MessageQueue.flushedQueue()将MessageQueue中的所有数据通过C层发往JS层。
+
+```javascript
+
+class MessageQueue {
+
+  flushedQueue() {
+    this.__callImmediates();
+
+    const queue = this._queue;
+    this._queue = [[], [], [], this._callID];
+    return queue[0].length ? queue : null;
+  }
 
 
+}
+```
+事件到达Java层后调用NativeModulesReactCallback.call()方法。
+
+``
 
 
-## JS调用Java
 
 
 
