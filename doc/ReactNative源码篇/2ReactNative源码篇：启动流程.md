@@ -1,3 +1,5 @@
+# ReactNative源码篇：启动流程
+
 作者: 郭孝星  
 邮箱: guoxiaoxingse@163.com  
 博客: http://blog.csdn.net/allenwells   
@@ -16,16 +18,12 @@ star文章, 关注文章的最新的动态。另外建议大家去Github上浏�
 
 文章目录：https://github.com/guoxiaoxing/react-native-android-container/blob/master/README.md
 
-
 在分析具体的启动流程之前，我们先从Demo代码入手，对外部的代码有个大致的印象，我们才能进一步去了解内部的逻辑。
 
-Java端代码
-
-ReactNativeHost：持有ReactInstanceManager实例，做一些初始化操作。
-
-SoLoader：加载C++底层库，准备解析JS。
+1 首先我们会在应用的Application里做RN的初始化操作。
 
 ```java
+  //ReactNativeHost：持有ReactInstanceManager实例，做一些初始化操作。
   private final ReactNativeHost mReactNativeHost = new ReactNativeHost(this) {
     @Override
     public boolean getUseDeveloperSupport() {
@@ -48,13 +46,14 @@ SoLoader：加载C++底层库，准备解析JS。
   @Override
   public void onCreate() {
     super.onCreate();
+    //SoLoader：加载C++底层库，准备解析JS。
     SoLoader.init(this, /* native exopackage */ false);
   }
 }
 
 ```
 
-继承ReactActivity，注册组件名。
+2 页面继承ReactActivity，ReactActivity作为JS页面的容器。
 
 
 ```java
@@ -66,14 +65,13 @@ public class MainActivity extends ReactActivity {
      */
     @Override
     protected String getMainComponentName() {
+        //返回组件名
         return "standard_project";
     }
 }
 ```
 
-JS端代码
-
-Component：UI渲染，生命周期控制，事件分发与回调。
+3 有了ReactActivity作为容器，我们就可以用JS开发页面了。
 
 ```javascript
 import React, { Component } from 'react';
@@ -84,6 +82,7 @@ import {
   View
 } from 'react-native';
 
+//Component用来做UI渲染，生命周期控制，事件分发与回调。
 export default class standard_project extends Component {
   //render函数返回UI的界面结构（JSX编写，编译完成后最终会变成JS代码）
   render() {
@@ -127,6 +126,14 @@ const styles = StyleSheet.create({
 //注册组件名，JS与Java格子各自维护了一个注册表
 AppRegistry.registerComponent('standard_project', () => standard_project);
 ```
+以上便是RN开发的三个步骤，本篇文章我们重点关注RN应用的启动流程，具体说来，有以下几个方面：
+
+```
+1 RN应用的启动调用流程，各组件完成的功能。😌
+```
+
+好，我们先从ReactActivity入手。
+
 
 通过以上我们对Java与JS的调用有了大致的了解，我们来进一步分析启动流程，话不多说，先上启动流程图。
 
