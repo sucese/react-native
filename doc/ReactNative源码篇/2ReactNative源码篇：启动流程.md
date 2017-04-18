@@ -158,6 +158,22 @@ ThemedReactContext：继承于ReactContext，也是ReactContext的wrapper类。
 
 ## 启动流程
 
+### 实现概要
+
+```
+1 在程序启动的时候，也就是ReContextactActivity的onCreate函数中，我们会去创建一个ReactInstanceManagerImpl对象
+
+2 ReactRootView作为整个RN应用的根视图，通过调用ReactRootView.startReactApplication()方法启动RN应用。
+
+3 RN应用页面渲染前，需要先创建ReactContext的创建流程在，异步任务ReactContextInitAsyncTask负责来完成这个任务。
+
+4 ReactContext的创建流程在ReactContextInitAsyncTask.doInBackground()方法中完成，创建ReactContext的过程中，会依据ReactPackage创建
+JavaScriptModuleRegistry与NativeModuleRegistry注册表以及它们的管理类CatalystInstanceImpl，同时创建JS、Native与UI线程队列，并最终调
+用CatalystInstanceImpl.runJSBundle()去加载JS Bundle文件。
+```
+
+### 实现细节
+
 好，我们先从ReactActivity入手。😌
 
 ReactActivity继承于Activity，并实现了它的生命周期方法。ReactActivity自己并没有做什么事情，所有的功能都由它的委托类ReactActivityDelegate来完成。
@@ -1141,29 +1157,5 @@ JSExecutor& executor：即前面我们分析过的JSCExecutor
 folly::dynamic&& calls：解析成功的JS的JSON通信参数结构
 bool isEndOfBatch：通知当前的JS Bundle是否处理完成。
 ```
-
-
-```java
-public class CatalystInstanceImpl {implements CatalystInstance {
-
-  public native void setGlobalVariable(String propName, String jsonValue);
-  
-}
-```
-
-总结一下上述的整个路程
-
-```
-1 在程序启动的时候，也就是ReContextactActivity的onCreate函数中，我们会去创建一个ReactInstanceManagerImpl对象
-
-2 通过ReactRootView的startReactApplication方法开启整个RN世界的大门
-
-3 在这个方法中，我们会通过一个AsyncTask去创建ReactContext
-
-4 在创建ReactContext过程中，我们把我们自己注入(MainReactPackage)的和系统生成(CoreModulesPackage)的package通过processPackage方法将其中的各个modules注入到了对应的Registry中
-
-5 最后通过CatalystInstanceImpl中的ReactBridge将java的注册表通过jni传输到了JS层。
-```
-
 
 
