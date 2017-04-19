@@ -17,7 +17,7 @@ import {
 
 export default class android_container extends Component {
 
-    onPressView() {
+    onPressJavaCallJavascript() {
 
     }
 
@@ -47,8 +47,8 @@ export default class android_container extends Component {
 
                     <View style={styles.button}>
                         <Button
-                            title='View'
-                            onPress={this.onPressView}/>
+                            title='Java Call Javascript'
+                            onPress={this.onPressJavaCallJavascript}/>
                     </View>
 
                     <View style={styles.button}>
