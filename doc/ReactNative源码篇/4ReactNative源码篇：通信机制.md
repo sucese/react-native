@@ -3,11 +3,11 @@
 博客: http://blog.csdn.net/allenwells   
 简书: http://www.jianshu.com/users/66a47e04215b/latest_articles  
 
-**关于作者**
+*关于作者*
 
 >郭孝星，非著名程序员，代码洁癖患者，爱编程，好吉他，喜烹饪，爱一切有趣的事物和人。
 
-**关于文章**
+*关于文章*
 
 >作者的文章会同时发布在Github、CSDN与简书上, 文章顶部也会附上文章的Github链接。如果文章中有什么疑问也欢迎发邮件与我交流, 对于交流
 的问题, 请描述清楚问题并附上代码与日志, 一般都会给予回复。如果文章中有什么错误, 也欢迎斧正。如果你觉得本文章对你有所帮助, 也欢迎去
@@ -39,7 +39,7 @@ JSBundle：JS代码包，存放JS核心逻辑。
 
 ## Java层调用JS层
 
-**举例**
+*举例*
 
 在上一篇文章：[ReactNative源码篇：启动流程]()中，我们在ReactInstanceManager.onAttachedToReactInstance()方法中调用APPRegistry.jS的runApplication()来
 启动RN应用，这就是一个典型的Java层调用JS层的例子，我们来具体分析一下这个例子的实现方式。
@@ -47,7 +47,7 @@ JSBundle：JS代码包，存放JS核心逻辑。
 1 首先定义了接口AppRegistry，该接口继承于JavaScriptModule，如下所示：
 
 ```java
-/**
+/*
  * JS module interface - main entry point for launching React application for a given key.
  */
 public interface AppRegistry extends JavaScriptModule {
@@ -61,7 +61,7 @@ public interface AppRegistry extends JavaScriptModule {
 
 2 然后在CoreModulesPackage.createJSModules()将它添加到JavaScriptModule列表中，这个列表最终会被添加到JavaScriptModuleRegistry中。
 
-···java
+```java
 class CoreModulesPackage extends LazyReactPackage implements ReactPackageLogger {
   @Override
   public List<Class<? extends JavaScriptModule>> createJSModules() {
@@ -83,7 +83,7 @@ class CoreModulesPackage extends LazyReactPackage implements ReactPackageLogger 
     return jsModules;
   }
 }
-···
+```
 
 3 通过Java层调用AppRegistry.js的runApplication()方法，如下所示：
 
@@ -209,7 +209,7 @@ public class JavaScriptModuleRegistry {
 
 可以看出，在JavaScriptModuleRegistry通过动态代理的方式获取JavaScriptModule，对Java动态代理不熟悉的同学，这里我们先简单回忆一下Java动态代理相关内容。
 
-**Java动态代理**
+*Java动态代理*
 
 ```
 Java动态代理主要涉及两个类：
@@ -279,7 +279,7 @@ CatalystInstanceImpl.java在C++层有个对应的类CatalystInstanceImpl.cpp。
 
 #### 3 CatalystInstanceImpl.jniCallJSFunction(JExecutorToken* token, std::string module, std::string method, NativeArray* arguments)
 
-**CatalystInstanceImpl.cpp**
+*CatalystInstanceImpl.cpp*
 
 ```c++
 void CatalystInstanceImpl::jniCallJSFunction(
@@ -304,7 +304,7 @@ Android平台适配的封装，主要做了写参数类型转换，本质上它�
 
 #### 4 Instance.callJSFunction(ExecutorToken token, std::string&& module, std::string&& method, folly::dynamic&& params)
 
-**Instance.cpp**
+*Instance.cpp*
 
 ```c++
 void Instance::callJSFunction(ExecutorToken token, std::string&& module, std::string&& method,
@@ -318,7 +318,7 @@ Instance.cpp的callJSFunction()进一步去调用NativeToJsBridge.cpp的callFunc
 
 #### 5 NativeToJsBridge.callFunction(ExecutorToken executorToken, std::string&& module, std::string&& method, folly::dynamic&& arguments)
 
-**NativeToJsBridge.cpp**
+*NativeToJsBridge.cpp*
 
 ```c++
 void NativeToJsBridge::callFunction(
@@ -362,7 +362,7 @@ NativeToJsBridge.cpp的callFunction()进一步去调用JSCExecutor.cppd的callFu
 
 #### 6 JSCExecutor.callFunction(const std::string& moduleId, const std::string& methodId, const folly::dynamic& arguments)
 
-**JSCExecutor.cpp**
+*JSCExecutor.cpp*
 
 ```c++
 void JSCExecutor::callFunction(const std::string& moduleId, const std::string& methodId, const folly::dynamic& arguments) {
@@ -410,7 +410,7 @@ void JSCExecutor::bindBridge() throw(JSException) {
 
 MessageQueue.callFunctionReturnFlushedQueue()方法的实现如下所示：
 
-**MessageQueue.js**
+*MessageQueue.js*
 
 ```javascript
   callFunctionReturnFlushedQueue(module: string, method: string, args: Array<any>) {
