@@ -87,7 +87,7 @@ android {
     buildToolsVersion '25.0.2'
 
     defaultConfig {
-        applicationId "com.android_container"
+        applicationId "com.guoxiaoxing.react.demo"
         minSdkVersion 16
         targetSdkVersion 25
         versionCode 1

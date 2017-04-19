@@ -1,4 +1,4 @@
-package com.android_container;
+package com.guoxiaoxing.react.demo;
 
 import com.facebook.react.ReactActivity;
 
