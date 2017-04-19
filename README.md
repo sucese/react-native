@@ -54,7 +54,7 @@
 - [1ReactNative源码篇：通信机制](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/4ReactNative源码篇：通信机制.md)
 - [1ReactNative源码篇：线程模型](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/5ReactNative源码篇：线程模型.md)
 
-## ReactNative实践篇ß
+## ReactNative实践篇
 
 >本篇系列文章主要从性能优化、崩溃监测等方面进一步阐述ReactNative在生产环境下的最佳实践以及改进优化。
 

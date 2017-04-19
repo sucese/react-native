@@ -55,6 +55,7 @@ public interface AppRegistry extends JavaScriptModule {
   void runApplication(String appKey, WritableMap appParameters);
   void unmountApplicationComponentAtRootTag(int rootNodeTag);
   void startHeadlessTask(int taskId, String taskKey, WritableMap data);
+  
 }
 
 ```
