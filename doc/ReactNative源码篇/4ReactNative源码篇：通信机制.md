@@ -237,7 +237,7 @@ InvocationHandler handler：调用处理器实例，指定代理类具体要做�
 
 JavaScriptModuleInvocationHandler.invoke()方法获取了moduleID，methodID，并去调用CatalystInstanceImpl.callFunction();
 
-#### 2 CatalystInstanceImpl.callFunction(ExecutorToken executorToken, final String module, final String method, final NativeArray arguments);
+#### 2 CatalystInstanceImpl.callFunction(ExecutorToken executorToken, final String module, final String method, final NativeArray arguments)
 
 ```java
 
