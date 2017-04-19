@@ -55,7 +55,6 @@ public interface AppRegistry extends JavaScriptModule {
   void runApplication(String appKey, WritableMap appParameters);
   void unmountApplicationComponentAtRootTag(int rootNodeTag);
   void startHeadlessTask(int taskId, String taskKey, WritableMap data);
-  
 }
 
 ```
@@ -64,6 +63,7 @@ public interface AppRegistry extends JavaScriptModule {
 
 ```java
 class CoreModulesPackage extends LazyReactPackage implements ReactPackageLogger {
+
   @Override
   public List<Class<? extends JavaScriptModule>> createJSModules() {
     List<Class<? extends JavaScriptModule>> jsModules = new ArrayList<>(Arrays.asList(
@@ -99,17 +99,27 @@ Java层
 
 ```
 1 把要实现的功能编写成接口并继承JavaScriptModule，并交由ReactPackage管理，最终会在RN初始化的时候添加到JavaScriptModuleRegistry映射表中。
+2 通过ReactContext或者CatalystInstanceImpl获取JavaScriptModule，它们最终会通过JavaScriptModuleRegistry.getJavaScriptModule()获取对应的JavaScriptModule。
+3 JavaScriptModuleRegistry通过动态代理生成对应的JavaScriptModule，然后通过invoke()调用相应的JS方法，该方法会进一步去调用CatalystInstanceImpl.callJSFunction()
+该方法会调用native方法CatalystInstanceImpl.jniCallJSFunction()方法将相关参数传递到C++层，至此，整个流程便转入C++层。
 
 ```
 
 C++层
 
 ```
+4 CatalystInstanceImpl在C++层对应的是类CatalystInstanceImpl.cpp。CatalystInstanceImpl.cpp是RN针对Android平台的包装类，具体功能由Instance.cpp来完成，
+即Instance.cpp的callJSFunction()方法。
+5 Instance.cpp的callJSFunction()方法按照调用链：Instance.callJSFunction()->NativeToJsBridge.callFunction()->JSCExecutor.callFunction()最终将
+功能交由JSCExecutor.cpp的callFunction()方法来完成。
+6 JSCExecutor.cpp的callFunction()方法通过Webkit JSC调用JS层的MessageQueue.js里的callFunctionReturnFlushedQueue()方法，自此整个流程转入JavaScript层。
 ```
 
 JavaScript层
 
 ```
+7 MessageQueue.js里的callFunctionReturnFlushedQueue()方法，该方法按照调用链：MessageQueue.callFunctionReturnFlushedQueue()->MessageQueue.__callFunction()
+在JS层里的JavaScriptModule映射表里产找对应的JavaScriptModule及方法。
 ```
 
 
@@ -284,6 +294,7 @@ CatalystInstanceImpl.java在C++层有个对应的类CatalystInstanceImpl.cpp。
 
 ```c++
 void CatalystInstanceImpl::jniCallJSFunction(
+
     JExecutorToken* token, std::string module, std::string method, NativeArray* arguments) {
   // We want to share the C++ code, and on iOS, modules pass module/method
   // names as strings all the way through to JS, and there's no way to do
@@ -570,8 +581,6 @@ class MessageQueue {
     this._queue = [[], [], [], this._callID];
     return queue[0].length ? queue : null;
   }
-
-
 }
 ```
 事件到达Java层后调用NativeModulesReactCallback.call()方法。
