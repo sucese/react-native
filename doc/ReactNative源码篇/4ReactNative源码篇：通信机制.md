@@ -34,14 +34,14 @@ JSBundleLoader：用于加载JSBundle的类，根据不同的情况会创建不�
 JSBundle：JS代码包，存放JS核心逻辑。
 ```
 
-在上一篇文章：[ReactNative源码篇：启动流程](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/2ReactNative源码篇：启动流程.md)中，我们知道RN应用在启动的时候会创建JavaScriptModule映射表（JavaScriptModuleRegistry）与NativeModule映射表（NativeModuleRegistry），RN中Java层
+在上一篇文章[ReactNative源码篇：启动流程](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/2ReactNative源码篇：启动流程.md)中，我们知道RN应用在启动的时候会创建JavaScriptModule映射表（JavaScriptModuleRegistry）与NativeModule映射表（NativeModuleRegistry），RN中Java层
 与JS层的通信就是通过这两张表来完成的，我们来详细看一看。
 
 ## Java层调用JS层
 
 **举例**
 
-在上一篇文章：[ReactNative源码篇：启动流程](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/2ReactNative源码篇：启动流程.md)中，我们在ReactInstanceManager.onAttachedToReactInstance()方法中调用APPRegistry.jS的runApplication()来
+在上一篇文章[ReactNative源码篇：启动流程](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/2ReactNative源码篇：启动流程.md)中，我们在ReactInstanceManager.onAttachedToReactInstance()方法中调用APPRegistry.jS的runApplication()来
 启动RN应用，这就是一个典型的Java层调用JS层的例子，我们来具体分析一下这个例子的实现方式。
 
 1 首先定义了接口AppRegistry，该接口继承于JavaScriptModule，如下所示：
