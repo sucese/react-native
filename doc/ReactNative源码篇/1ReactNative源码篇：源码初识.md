@@ -62,15 +62,15 @@ ReactNative系统框架图如下所示：
 
 从上面对ReactNative系统框架的分析，我们很容易看出源码的主线就在于ReactNative的启动流程、UI的绘制与渲染以及双边通信（Java调用JS，JS调用Java）。
 
-
-
 源码主线：
 
 ```
-1 ReactNative的启动与加载流程
-2 UI的绘制与渲染
-3 JS与Java的双边通信。
+1 ReactNative应用启动流程
+2 ReactNative应用UI的绘制与渲染
+3 ReactNative应用通信机制
+3 ReactNative应用线程模型
 ```
+
 源码支线：
 
 ```
@@ -78,3 +78,70 @@ ReactNative系统框架图如下所示：
 2 SOLoader加载动态链接库
 3 ReactNative触摸事件处理机制
 ```
+
+在正式开始分析源码之前，我们先简单介绍一下各个类的作用，让大家先有个大概的印象，方便以后的讲解。
+
+ReactContext(Java层)
+
+```
+继承于ContextWrapper，是RN应用的上下文，通过getContext()去获得，通过它可以访问RN核心类的实现。
+```
+ReactInstanceManagerImpl/ReactInstanceManagerImpl(Java层)
+
+```
+RN应用总的管理类，创建ReactContext、CatalystInstance等类，解析ReactPackage生成映射表，并且配合ReactRootView管理View的创建与生命周期等功能。
+```
+
+CatalystInstance/CatalystInstanceImpl(Java层/C++层)
+
+```
+RN应用Java层、C++层、JS层通信总管理类，总管Java层、JS层核心Module映射表与回调，三端通信的入口与桥梁。
+```
+
+NativeToJsBridge(C++层)
+
+```
+Java调用JS的桥梁，用来调用JS Module，回调Java。
+```
+
+JsToNativeBridge(C++层)
+
+```
+JS调用Java的桥梁，用来调用Java Module。
+```
+
+JSCExecutor(C++层)
+
+```
+管理WebKit的JavaScriptCore，JS与C++的转换桥接都在这里进行中转处理。
+```
+MessageQueue(JS层)
+
+```
+JS调用队列，调用Java Module或者JS Module的方法，处理回调。
+```
+
+JavaScriptModule(Java层)
+
+```
+JS Module，负责JS到Java的映射调用格式声明，由CatalystInstance统一管理。
+```
+
+ReactContextBaseJavaModule/BaseJavaModule/NativeModule(Java层)
+
+```
+Java Module，负责Java到Js的映射调用格式声明，由CatalystInstance统一管理。
+```
+
+JavascriptModuleRegistry(Java层)
+
+```
+JS Module映射表
+```
+NativeModuleRegistry(Java层)
+
+```
+Java Module映射表
+```
+
+

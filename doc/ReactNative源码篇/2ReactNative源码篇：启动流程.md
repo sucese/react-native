@@ -187,7 +187,6 @@ ReactActivity继承于Activity，并实现了它的生命周期方法。ReactAct
 
 所以我们主要来关注ReactActivityDelegate的实现。我们先来看看ReactActivityDelegate的onCreate()方法。
 
-
 ### Java层实现细节
 
 #### 1 ReactActivityDelegate.onCreate(Bundle savedInstanceState)

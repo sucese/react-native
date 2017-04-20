@@ -19,21 +19,6 @@ star文章, 关注文章的最新的动态。另外建议大家去Github上浏�
 >通信，指的是RN中Java与JS的通信，即JS中的JSX代码如何转化成Java层真实的View与事件的，以及JavaFile层又是如何调用JS来找出它需要的View与
 事件的。
 
-在正式介绍通信流程之前，我们先来看看整个流程中牵扯到的各个类的作用。
-
-```
-ReactInstanceManager：创建ReactContext、CatalystInstance等类，解析ReactPackage生成映射表，并且配合ReactRootView管理View的创建与生命周期等功能。
-ReactContext：继承于ContextWrapper，是Rn应用的上下文，可以通过getContext()去获得。
-ReactRootView：Rn应用的根视图。
-ReactBridge：通信的核心类，通过JNI方式进行调用，C++层作为通信中间层。
-NativeModuleRegistry：Java Module映射表。
-JavascriptModuleRegistry：JS Module映射表。
-CoreModulePackage：RN核心框架Package，包括Java接口与JS接口。
-MainReactPackage：Rn封装的一些通用的Java组件与事件。
-JSBundleLoader：用于加载JSBundle的类，根据不同的情况会创建不同的Loader。
-JSBundle：JS代码包，存放JS核心逻辑。
-```
-
 在上一篇文章[ReactNative源码篇：启动流程](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/2ReactNative源码篇：启动流程.md)中，我们知道RN应用在启动的时候会创建JavaScriptModule映射表（JavaScriptModuleRegistry）与NativeModule映射表（NativeModuleRegistry），RN中Java层
 与JS层的通信就是通过这两张表来完成的，我们来详细看一看。
 
@@ -461,7 +446,150 @@ MessageQueue.callFunctionReturnFlushedQueue()方法的实现如下所示：
   }
 ```
 
-## JS调用Java
+好，以上就是Java层代码调用JS层代码的全部流程，我们再来总结一下：
+
+Java层
+
+```
+1 把要实现的功能编写成接口并继承JavaScriptModule，并交由ReactPackage管理，最终会在RN初始化的时候添加到JavaScriptModuleRegistry映射表中。
+2 通过ReactContext或者CatalystInstanceImpl获取JavaScriptModule，它们最终会通过JavaScriptModuleRegistry.getJavaScriptModule()获取对应的JavaScriptModule。
+3 JavaScriptModuleRegistry通过动态代理生成对应的JavaScriptModule，然后通过invoke()调用相应的JS方法，该方法会进一步去调用CatalystInstanceImpl.callJSFunction()
+该方法会调用native方法CatalystInstanceImpl.jniCallJSFunction()方法将相关参数传递到C++层，至此，整个流程便转入C++层。
+
+```
+
+C++层
+
+```
+4 CatalystInstanceImpl在C++层对应的是类CatalystInstanceImpl.cpp。CatalystInstanceImpl.cpp是RN针对Android平台的包装类，具体功能由Instance.cpp来完成，
+即Instance.cpp的callJSFunction()方法。
+5 Instance.cpp的callJSFunction()方法按照调用链：Instance.callJSFunction()->NativeToJsBridge.callFunction()->JSCExecutor.callFunction()最终将
+功能交由JSCExecutor.cpp的callFunction()方法来完成。
+6 JSCExecutor.cpp的callFunction()方法通过Webkit JSC调用JS层的MessageQueue.js里的callFunctionReturnFlushedQueue()方法，自此整个流程转入JavaScript层。
+```
+
+JavaScript层
+
+```
+7 MessageQueue.js里的callFunctionReturnFlushedQueue()方法，该方法按照调用链：MessageQueue.callFunctionReturnFlushedQueue()->MessageQueue.__callFunction()
+在JS层里的JavaScriptModule映射表里产找对应的JavaScriptModule及方法。
+```
+
+接下来，我们分析一下JS代码调用Java代码的流程。
+
+## JS层调用Java层
+
+**举例**
+
+同样的，我们先来看一个JS代码调用Java代码的例子，我们写一个ToastModule供JS代码调用。
+
+1 编写ToastModule继承于ReactContextBaseJavaModule，该ToastModule实现具体的功能供JS代码调用。
+
+```java
+public class ToastModule extends ReactContextBaseJavaModule {
+
+  private static final String DURATION_SHORT_KEY = "SHORT";
+  private static final String DURATION_LONG_KEY = "LONG";
+
+  public ToastModule(ReactApplicationContext reactContext) {
+    super(reactContext);
+  }
+
+  //返回模块名字供JS代码调用
+  @Override
+  public String getName() {
+    return "ToastAndroid";
+  }
+
+  //返回常量供JS代码调用
+  @Override
+  public Map<String, Object> getConstants() {
+    final Map<String, Object> constants = new HashMap<>();
+    constants.put(DURATION_SHORT_KEY, Toast.LENGTH_SHORT);
+    constants.put(DURATION_LONG_KEY, Toast.LENGTH_LONG);
+    return constants;
+  }
+
+  //暴露给JS代码的方法，加@ReactMethod注解，且该方法总是void。
+  @ReactMethod
+  public void show(String message, int duration) {
+    Toast.makeText(getReactApplicationContext(), message, duration).show();
+  }
+}
+
+```
+
+2 编写类继承ReactPackage，注册ToastModule。
+
+```java
+public class AnExampleReactPackage implements ReactPackage {
+
+  @Override
+  public List<Class<? extends JavaScriptModule>> createJSModules() {
+    return Collections.emptyList();
+  }
+
+  @Override
+  public List<ViewManager> createViewManagers(ReactApplicationContext reactContext) {
+    return Collections.emptyList();
+  }
+
+  @Override
+  public List<NativeModule> createNativeModules(
+                              ReactApplicationContext reactContext) {
+    List<NativeModule> modules = new ArrayList<>();
+
+    modules.add(new ToastModule(reactContext));
+
+    return modules;
+  }
+
+}
+```
+
+```java
+protected List<ReactPackage> getPackages() {
+    return Arrays.<ReactPackage>asList(
+            new MainReactPackage(),
+            new AnExampleReactPackage()); // <-- Add this line with your package name.
+}
+```
+
+3 为了方便JS代码调用，编写一个JS Module来包装Native Module的功能。
+
+```javascript
+
+'use strict';
+/**
+ * This exposes the native ToastAndroid module as a JS module. This has a
+ * function 'show' which takes the following parameters:
+ *
+ * 1. String message: A string with the text to toast
+ * 2. int duration: The duration of the toast. May be ToastAndroid.SHORT or
+ *    ToastAndroid.LONG
+ */
+import { NativeModules } from 'react-native';
+module.exports = NativeModules.ToastAndroid;
+```
+
+4 最后我们就可以直接在JS代码中进行调用。
+
+```javascript
+
+import ToastAndroid from './ToastAndroid';
+
+ToastAndroid.show('Awesome', ToastAndroid.SHORT);
+```
+
+以上便是JS代码调用Java代码的全部流程，我们来具体分析它的实现细节。
+
+### 实现概要
+
+### 实现细节
+
+从上面例子中，我们可以看粗，调用的第一步就是从JS层的NativeModule映射表中拿到对应Java层的Java Module。
+
+
 
 JS在调用Java并不是通过接口来进行的，而是对应的参数moduleID、methodID都push到一个messageQueue中，等待Java层的事件来驱动它，当Java层的事件传递过来以后，JS层把messageQUeue中的所有数据返回到Java层，再通过映射表JavaRegistry去
 调用方法。
@@ -476,6 +604,362 @@ JS在调用Java并不是通过接口来进行的，而是对应的参数moduleID
 5 通过反射执行方法。
 ```
 
+**NativeModules.js**
+
+```javascript
+
+let NativeModules : {[moduleName: string]: Object} = {};
+if (global.nativeModuleProxy) {
+  //nativeModuleProxy实质上是在启动流程中，JSCExecutor::JSCExecutor()在创建时通过installGlobalProxy(m_context, "nativeModuleProxy", exceptionWrapMethod<&JSCExecutor::getNativeModule>())
+  //创建的，所以当JS调用NativeModules时，实际上在调用JSCExecutor::getNativeModule()方法。
+  NativeModules = global.nativeModuleProxy;
+} else {
+  const bridgeConfig = global.__fbBatchedBridgeConfig;
+  invariant(bridgeConfig, '__fbBatchedBridgeConfig is not set, cannot invoke native modules');
+
+  (bridgeConfig.remoteModuleConfig || []).forEach((config: ModuleConfig, moduleID: number) => {
+    // Initially this config will only contain the module name when running in JSC. The actual
+    // configuration of the module will be lazily loaded.
+    const info = genModule(config, moduleID);
+    if (!info) {
+      return;
+    }
+
+    if (info.module) {
+      NativeModules[info.name] = info.module;
+    }
+    // If there's no module config, define a lazy getter
+    else {
+      defineLazyObjectProperty(NativeModules, info.name, {
+        get: () => loadModule(info.name, moduleID)
+      });
+    }
+  });
+}
+
+module.exports = NativeModules;
+```
+nativeModuleProxy实质上是在启动流程中，JSCExecutor::JSCExecutor()在创建时通过installGlobalProxy(m_context, "nativeModuleProxy", exceptionWrapMethod<&JSCExecutor::getNativeModule>())
+创建的，所以当JS调用NativeModules时，实际上在调用JSCExecutor::getNativeModule()方法，我们来看一看该方法的实现。
+
+
+```c++
+
+JSValueRef JSCExecutor::getNativeModule(JSObjectRef object, JSStringRef propertyName) {
+  if (JSC_JSStringIsEqualToUTF8CString(m_context, propertyName, "name")) {
+    return Value(m_context, String(m_context, "NativeModules"));
+  }
+  //m_nativeModules的类型是JSCNativeModules
+  return m_nativeModules.getModule(m_context, propertyName);
+}
+```
+
+该方法进一步调用JSCNativeModules.cpp的getModule()方法，我们来看看它的实现。
+
+**JSCNativeModules.cpp**
+
+```c++
+JSValueRef JSCNativeModules::getModule(JSContextRef context, JSStringRef jsName) {
+  if (!m_moduleRegistry) {
+    return Value::makeUndefined(context);
+  }
+
+  std::string moduleName = String::ref(context, jsName).str();
+
+  const auto it = m_objects.find(moduleName);
+  if (it != m_objects.end()) {
+    return static_cast<JSObjectRef>(it->second);
+  }
+
+  //调用该方法，通过JSC获取全局设置的JS属性，然后通过JNI查找Java层映射表，再触发JS层方法。
+  auto module = createModule(moduleName, context);
+  if (!module.hasValue()) {
+    return Value::makeUndefined(context);
+  }
+
+  // Protect since we'll be holding on to this value, even though JS may not
+  module->makeProtected();
+
+  auto result = m_objects.emplace(std::move(moduleName), std::move(*module)).first;
+  return static_cast<JSObjectRef>(result->second);
+}
+
+folly::Optional<Object> JSCNativeModules::createModule(const std::string& name, JSContextRef context) {
+  if (!m_genNativeModuleJS) {
+
+    auto global = Object::getGlobalObject(context);
+    //JSC通过NativeModules.js中global.__fbGenNativeModule = genModule属性
+    m_genNativeModuleJS = global.getProperty("__fbGenNativeModule").asObject();
+    m_genNativeModuleJS->makeProtected();
+
+    // Initialize the module name list, otherwise getModuleConfig won't work
+    // TODO (pieterdb): fix this in ModuleRegistry
+    m_moduleRegistry->moduleNames();
+  }
+  //获取Native配置表
+  auto result = m_moduleRegistry->getConfig(name);
+  if (!result.hasValue()) {
+    return nullptr;
+  }
+
+  Value moduleInfo = m_genNativeModuleJS->callAsFunction({
+    Value::fromDynamic(context, result->config),
+    Value::makeNumber(context, result->index)
+  });
+  CHECK(!moduleInfo.isNull()) << "Module returned from genNativeModule is null";
+
+  return moduleInfo.asObject().getProperty("module").asObject();
+}
+
+```
+
+上面的方法实现的功能分为2步：
+
+```
+1 通过C++获取Java层映射表。
+2 通过JSC调用JS层方法。
+```
+
+**ModuleRegistry.js**
+
+```c++
+ 
+folly::Optional<ModuleConfig> ModuleRegistry::getConfig(const std::string& name) {
+  SystraceSection s("getConfig", "module", name);
+  auto it = modulesByName_.find(name);
+  if (it == modulesByName_.end()) {
+    return nullptr;
+  }
+
+  CHECK(it->second < modules_.size());
+  //modules_列表来源于CatalystInstanceImpl::initializeBridge()
+  //module实质上是ModuleRegistryHolder.cpp的构造函数汇总将Java层传递过来的Module包装成CxxNativeModule与JavaModule，这两个都是NativeModule的子类。
+  NativeModule* module = modules_[it->second].get();
+
+  //string name, object constants, array methodNames准备创建一个动态对象。
+  // string name, object constants, array methodNames (methodId is index), [array promiseMethodIds], [array syncMethodIds]
+  folly::dynamic config = folly::dynamic::array(name);
+
+  {
+    SystraceSection s("getConstants");
+    //通过反射调用Java层的JavaModuleWrapper.getContants()shi方法。
+    config.push_back(module->getConstants());
+  }
+
+  {
+    SystraceSection s("getMethods");
+    //通过反射调用Java层的JavaModuleWrapper.getMethods()方法，也就是BaseJavaModule.getMethods()，该方法内部会调用
+    //findMethos()方法查询带有ReactMoethod注解的方法。
+    std::vector<MethodDescriptor> methods = module->getMethods();
+
+    folly::dynamic methodNames = folly::dynamic::array;
+    folly::dynamic promiseMethodIds = folly::dynamic::array;
+    folly::dynamic syncMethodIds = folly::dynamic::array;
+
+    for (auto& descriptor : methods) {
+      // TODO: #10487027 compare tags instead of doing string comparison?
+      methodNames.push_back(std::move(descriptor.name));
+      if (descriptor.type == "promise") {
+        promiseMethodIds.push_back(methodNames.size() - 1);
+      } else if (descriptor.type == "sync") {
+        syncMethodIds.push_back(methodNames.size() - 1);
+      }
+    }
+
+    if (!methodNames.empty()) {
+      config.push_back(std::move(methodNames));
+      if (!promiseMethodIds.empty() || !syncMethodIds.empty()) {
+        config.push_back(std::move(promiseMethodIds));
+        if (!syncMethodIds.empty()) {
+          config.push_back(std::move(syncMethodIds));
+        }
+      }
+    }
+  }
+
+  if (config.size() == 1) {
+    // no constants or methods
+    return nullptr;
+  } else {
+    return ModuleConfig({it->second, config});
+  }
+}
+
+```
+
+获取到对应Module，就该生成Module，
+
+**NativeModules.js**
+
+```javascript
+
+// export this method as a global so we can call it from native
+global.__fbGenNativeModule = genModule;
+
+function genModule(config: ?ModuleConfig, moduleID: number): ?{name: string, module?: Object} {
+  if (!config) {
+    return null;
+  }
+
+  //通过JSC拿到C++中从Java层获取的Java Module的映射表
+  const [moduleName, constants, methods, promiseMethods, syncMethods] = config;
+  invariant(!moduleName.startsWith('RCT') && !moduleName.startsWith('RK'),
+    'Module name prefixes should\'ve been stripped by the native side ' +
+    'but wasn\'t for ' + moduleName);
+
+  if (!constants && !methods) {
+    // Module contents will be filled in lazily later
+    return { name: moduleName };
+  }
+
+  const module = {};
+  //遍历构建Module的属性与方法
+  methods && methods.forEach((methodName, methodID) => {
+    const isPromise = promiseMethods && arrayContains(promiseMethods, methodID);
+    const isSync = syncMethods && arrayContains(syncMethods, methodID);
+    invariant(!isPromise || !isSync, 'Cannot have a method that is both async and a sync hook');
+    const methodType = isPromise ? 'promise' : isSync ? 'sync' : 'async';
+    //生成Module的函数方法
+    module[methodName] = genMethod(moduleID, methodID, methodType);
+  });
+  Object.assign(module, constants);
+
+  if (__DEV__) {
+    BatchedBridge.createDebugLookup(moduleID, moduleName, methods);
+  }
+
+  return { name: moduleName, module };
+}
+
+```
+
+该方法通过JSC拿到C++中从Java层获取的Java Module的映射表，遍历构建Module的属性与方法，并调用genMethod()生成Module的函数方法，我们调用ToastAndroid.show(‘Awesome’, ToastAndroid.SHORT)时
+实际上就是在调用genMethod()生成的方法，我们来看一看它的实现。
+
+**NativeModules.js**
+
+```javascript
+//该函数会根据函数类型的不同做不同的处理，但最终都会调用BatchedBridge.enqueueNativeCall()方法。
+function genMethod(moduleID: number, methodID: number, type: MethodType) {
+  let fn = null;
+  if (type === 'promise') {
+    fn = function(...args: Array<any>) {
+      return new Promise((resolve, reject) => {
+        BatchedBridge.enqueueNativeCall(moduleID, methodID, args,
+          (data) => resolve(data),
+          (errorData) => reject(createErrorFromErrorData(errorData)));
+      });
+    };
+  } else if (type === 'sync') {
+    fn = function(...args: Array<any>) {
+      return global.nativeCallSyncHook(moduleID, methodID, args);
+    };
+  } else {
+    fn = function(...args: Array<any>) {
+      const lastArg = args.length > 0 ? args[args.length - 1] : null;
+      const secondLastArg = args.length > 1 ? args[args.length - 2] : null;
+      const hasSuccessCallback = typeof lastArg === 'function';
+      const hasErrorCallback = typeof secondLastArg === 'function';
+      hasErrorCallback && invariant(
+        hasSuccessCallback,
+        'Cannot have a non-function arg after a function arg.'
+      );
+      const onSuccess = hasSuccessCallback ? lastArg : null;
+      const onFail = hasErrorCallback ? secondLastArg : null;
+      const callbackCount = hasSuccessCallback + hasErrorCallback;
+      args = args.slice(0, args.length - callbackCount);
+      BatchedBridge.enqueueNativeCall(moduleID, methodID, args, onFail, onSuccess);
+    };
+  }
+  fn.type = type;
+  return fn;
+}
+```
+该函数会根据函数类型的不同做不同的处理，但最终都会调用BatchedBridge.enqueueNativeCall()方法，我们来看看它的实现。
+
+**MessageQueue.js**
+
+```javascript
+
+  enqueueNativeCall(moduleID: number, methodID: number, params: Array<any>, onFail: ?Function, onSucc: ?Function) {
+    if (onFail || onSucc) {
+      if (__DEV__) {
+        const callId = this._callbackID >> 1;
+        this._debugInfo[callId] = [moduleID, methodID];
+        if (callId > DEBUG_INFO_LIMIT) {
+          delete this._debugInfo[callId - DEBUG_INFO_LIMIT];
+        }
+      }
+      onFail && params.push(this._callbackID);
+      /* $FlowFixMe(>=0.38.0 site=react_native_fb,react_native_oss) - Flow error
+       * detected during the deployment of v0.38.0. To see the error, remove
+       * this comment and run flow */
+      this._callbacks[this._callbackID++] = onFail;
+      onSucc && params.push(this._callbackID);
+      /* $FlowFixMe(>=0.38.0 site=react_native_fb,react_native_oss) - Flow error
+       * detected during the deployment of v0.38.0. To see the error, remove
+       * this comment and run flow */
+      this._callbacks[this._callbackID++] = onSucc;
+    }
+
+    if (__DEV__) {
+      global.nativeTraceBeginAsyncFlow &&
+        global.nativeTraceBeginAsyncFlow(TRACE_TAG_REACT_APPS, 'native', this._callID);
+    }
+    this._callID++;
+
+    //_queue是个队列，用来存放调用的模块、方法与参数信息。
+    this._queue[MODULE_IDS].push(moduleID);
+    this._queue[METHOD_IDS].push(methodID);
+
+    if (__DEV__) {
+      // Any params sent over the bridge should be encodable as JSON
+      JSON.stringify(params);
+
+      // The params object should not be mutated after being queued
+      deepFreezeAndThrowOnMutationInDev((params:any));
+    }
+    this._queue[PARAMS].push(params);
+
+    const now = new Date().getTime();
+    //如果5ms内有多个方法调用则先待在队列里，防止过高频率的方法调用，否则则调用JSCExecutor::nativeFlushQueueImmediate(size_t argumentCount, const JSValueRef arguments[]) 方法。
+    if (global.nativeFlushQueueImmediate &&
+        now - this._lastFlush >= MIN_TIME_BETWEEN_FLUSHES_MS) {
+      global.nativeFlushQueueImmediate(this._queue);
+      this._queue = [[], [], [], this._callID];
+      this._lastFlush = now;
+    }
+    Systrace.counterEvent('pending_js_to_native_queue', this._queue[0].length);
+    if (__DEV__ && this.__spy && isFinite(moduleID)) {
+      this.__spy(
+        { type: TO_NATIVE,
+          module: this._remoteModuleTable[moduleID],
+          method: this._remoteMethodTable[moduleID][methodID],
+          args: params }
+      );
+    } else if (this.__spy) {
+      this.__spy({type: TO_NATIVE, module: moduleID + '', method: methodID, args: params});
+    }
+  }
+
+```
+
+流程走到这个方法的时候，JS层的调用流程就结束了，JS层主要通过JSC桥接获取Java Module的映射表，并把它转换为对应的JS Native Module（属性、方法转换），当JS
+通过NativeModule.xxxMethod()准备调用Java方法时，会把xxxMethod()放进一个JS队列，在队列中：
+
+```
+1 如果如果5m（MIN_TIME_BETWEEN_FLUSHES_MS）以内，则继续在队列中等待，防止高频率调用。
+2 如果5m（MIN_TIME_BETWEEN_FLUSHES_MS）以内，则直接触发的 JSCExecutor::nativeFlushQueueImmediate(size_t argumentCount, const JSValueRef arguments[]) 方法。
+```
+事实上，在队列中，如果是Java方法调用JS方法，则会把之前队列里存的方法通过JSCExecutor::flush()进行处理。
+
+我们再来看看JSCExecutor::nativeFlushQueueImmediate(size_t argumentCount, const JSValueRef arguments[]) 的实现。
+
+**JSCExecutor.cpp**
+
+```c++
+
+```
 
 ### 
 
