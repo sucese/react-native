@@ -78,7 +78,6 @@ ReactInstanceManager.setupReactContext()方法中，我们会调用attachMeasure
 
 ## 渲染原理
 
-
 **举例**
 
 在讲解原理之前，我们先来看一个简单的例子：
