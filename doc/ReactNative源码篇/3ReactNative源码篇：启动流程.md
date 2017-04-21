@@ -21,11 +21,12 @@ star文章, 关注文章的最新的动态。另外建议大家去Github上浏�
 >本篇系列文章主要分析ReactNative源码，分析ReactNative的启动流程、渲染原理、通信机制与线程模型等方面内容。
 
 - [1ReactNative源码篇：源码初识](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/1ReactNative源码篇：源码初识.md)
-- [2ReactNative源码篇：启动流程](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/2ReactNative源码篇：启动流程.md)
-- [3ReactNative源码篇：渲染原理](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/3ReactNative源码篇：渲染原理.md)
-- [4ReactNative源码篇：通信机制](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/4ReactNative源码篇：通信机制.md)
-- [5ReactNative源码篇：线程模型](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/5ReactNative源码篇：线程模型.md)
-
+- [2ReactNative源码篇：代码调用](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/2ReactNative源码篇：代码调用.md)
+- [3ReactNative源码篇：启动流程](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/3ReactNative源码篇：启动流程.md)
+- [4ReactNative源码篇：渲染原理](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/4ReactNative源码篇：渲染原理.md)
+- [5ReactNative源码篇：通信机制](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/5ReactNative源码篇：通信机制.md)
+- [6ReactNative源码篇：线程模型](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/6ReactNative源码篇：线程模型.md)
+								
 在分析具体的启动流程之前，我们先从Demo代码入手，对外部的代码有个大致的印象，我们才能进一步去了解内部的逻辑。
 
 1 首先我们会在应用的Application里做RN的初始化操作。
@@ -140,7 +141,7 @@ AppRegistry.registerComponent('standard_project', () => standard_project);
 1 RN应用的启动调用流程，各组件完成的功能。
 ```
 
-## 关键概念
+## 核心概念
 
 整个启动流程重要创建实例之一就是ReactContext，在正式介绍启动流程之前，我们先来了接一下ReactContext的概念。
 
@@ -151,7 +152,6 @@ AppRegistry.registerComponent('standard_project', () => standard_project);
 
 用户与操作系统的每一次交互都是一个场景，例如：打电话、发短信等有节目的场景（Activity），后台播放音乐等没有节目的场景（Service），这种交互的场景（Activity、Service等）都被
 抽象成了上下文环境（Context），它代表了当前对象再应用中所处的一个环境、一个与系统交互的过程。
-
 
 我们来了解一下ReactContext的具体实现与功能，先来看一下它的类图：
 
@@ -183,7 +183,7 @@ NativeModuleRegistry注册表以及它们的管理类CatalystInstanceImpl，同�
 ReactRootView加载进来，并调用RN应用的JS入口APPRegistry来启动应用。
 ```
 
-### 实现细节
+### 实现细节-Java层
 
 好，我们先从ReactActivity入手。😌
 
@@ -194,8 +194,6 @@ ReactActivity继承于Activity，并实现了它的生命周期方法。ReactAct
 <img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/4/ClusterCallButterfly-react-ReactActivity.png"/>
 
 所以我们主要来关注ReactActivityDelegate的实现。我们先来看看ReactActivityDelegate的onCreate()方法。
-
-### Java层实现细节
 
 #### 1 ReactActivityDelegate.onCreate(Bundle savedInstanceState)
 
@@ -693,16 +691,18 @@ private CatalystInstanceImpl(
 从CatalystInstanceImpl的构建过程可以看出，CatalystInstanceImpl是个封装管理类，封装了各种注册表，以及初始化JNI，我们来看看最后初始化Bridge传入的6个参数：
 
 ```
-ReactCallback callback：CatalystInstanceImpl的静态内部类，负责接口回调。
+ReactCallback callback：CatalystInstanceImpl的静态内部类ReactCallback，负责接口回调。
 JavaScriptExecutor jsExecutor：JS执行器，将JS的调用传递给C++层。
 MessageQueueThread jsQueue.getJSQueueThread()：JS线程，通过mReactQueueConfiguration.getJSQueueThread()获得，mReactQueueConfiguration通过ReactQueueConfigurationSpec.createDefault()创建。
 MessageQueueThread moduleQueue：Native线程，通过mReactQueueConfiguration.getNativeModulesQueueThread()获得，mReactQueueConfiguration通过ReactQueueConfigurationSpec.createDefault()创建。
-Collection<JavaModuleWrapper> javaModules：java modules。
-Collection<ModuleHolder> cxxModules)：c++ modules。
+Collection<JavaModuleWrapper> javaModules：java modules，来源于mJavaRegistry.getJavaModules(this)。
+Collection<ModuleHolder> cxxModules)：c++ modules，来源于mJavaRegistry.getCxxModules()。
 ```
 
 从上面的构造方法可以看出，从CatalystInstanceImpl将持有的JavaScriptModule注册表、NativeModule注册表、ReactCallback回调、JavaScriptExecutor、js消息队列
 native消息队列都通过JNI传递到C++层。
+
+### 实现细节-C++层
 
 **CatalystInstanceImpl.cpp**
 
