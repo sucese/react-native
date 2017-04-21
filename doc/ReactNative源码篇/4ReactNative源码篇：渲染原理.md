@@ -24,9 +24,9 @@ star文章, 关注文章的最新的动态。另外建议大家去Github上浏�
 - [2ReactNative源码篇：代码调用](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/2ReactNative源码篇：代码调用.md)
 - [3ReactNative源码篇：启动流程](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/3ReactNative源码篇：启动流程.md)
 - [4ReactNative源码篇：渲染原理](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/4ReactNative源码篇：渲染原理.md)
-- [5ReactNative源码篇：通信机制](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/5ReactNative源码篇：通信机制.md)
-- [6ReactNative源码篇：线程模型](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/6ReactNative源码篇：线程模型.md)
-
+- [6ReactNative源码篇：线程模型](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/5ReactNative源码篇：线程模型.md)
+- [5ReactNative源码篇：通信机制](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/6ReactNative源码篇：通信机制.md)
+                
 
 ## 工作机制
 
@@ -120,7 +120,42 @@ export default class standard_project extends Component {
 AppRegistry.registerComponent('standard_project', () => standard_project);
 ```
 
-我们知道render()函数返回的要绘制页面的DOM结构，为了更直观的理解他的实现。
+我们知道render()函数返回的要绘制页面的DOM结构，为了更直观的理解他的实现，我们先把render()函数里的JSX代码换成JS代码，如下所示：
+
+```
+'use strict';
+
+React.createElement(
+  View,
+  { style: styles.container },
+  React.createElement(
+    Text,
+    { style: styles.welcome },
+    'Welcome to React Native!'
+  ),
+  React.createElement(
+    Text,
+    { style: styles.instructions },
+    'To get started, edit index.android.js'
+  ),
+  React.createElement(
+    Text,
+    { style: styles.instructions },
+    'Double tap R on your keyboard to reload,',
+    '\n',
+    'Shake or press menu button for dev menu'
+  )
+);
+```
+
+可以看到View的创建实际上调用了React.createElement()，该方法的签名如下所示：
+
+```javascript
+ReactElement.createElement = function (type, config, children){ ... }
+```
+
+然后该方法按照以下调用链：
+
 
 
 ```java
