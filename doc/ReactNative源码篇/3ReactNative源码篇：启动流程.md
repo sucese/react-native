@@ -176,11 +176,13 @@ ThemedReactContext：继承于ReactContext，也是ReactContext的wrapper类。
 3 RN应用页面渲染前，需要先创建ReactContext的创建流程在，异步任务ReactContextInitAsyncTask负责来完成这个任务。
 
 4 ReactContextInitAsyncTask在后台ReactContextInitAsyncTask.doInBackground()执行ReactContext的创建，创建ReactContext的过程中，会依据ReactPackage创建JavaScriptModuleRegistry与
-NativeModuleRegistry注册表以及它们的管理类CatalystInstanceImpl，同时创建JS、Native与UI线程队列，并最终调用CatalystInstanceImpl.runJSBundle()去
+NativeModuleRegistry注册表以及它们的管理类CatalystInstanceImpl，同时创建JS、Native与UI线程队列，并最终调用CatalystInstanceImpl.runJSBundle()去异步
 加载JS Bundle文件。
 
 5 后台任务执行完成后，在ReactContextInitAsyncTask.onPostExecute()会调用ReactInstanceManager.setupReactContext()设置创建好的ReactContext，并将
 ReactRootView加载进来，并调用RN应用的JS入口APPRegistry来启动应用。
+
+6 JS层找到已经注册的对应的启动组件，执行renderApplication()来渲染整个应用。
 ```
 
 ### 实现细节-Java层

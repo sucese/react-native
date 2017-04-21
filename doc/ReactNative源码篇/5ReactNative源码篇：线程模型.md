@@ -317,3 +317,68 @@ Handler：与Looper相关联，处理Looper发送过来的消息，可以看到H
 每个Android应用在启动时都会创建一个UI线程，该线程会创建mainLooper，该Looper有且只会被创建一次。每个新创建的子线程，也可以加上Looper使得它具有消息
 循环的能力。
 ···
+
+在[3ReactNative源码篇：启动流程](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/3ReactNative源码篇：启动流程.md)文章中
+我们知道，在CatalystInstanceImpl.java里会调用initializeBridge()将新创建的JS线程与Native线程传入到C++层。
+
+```java
+public class CatalystInstanceImpl(
+  private CatalystInstanceImpl(
+      final ReactQueueConfigurationSpec ReactQueueConfigurationSpec,
+      final JavaScriptExecutor jsExecutor,
+      final NativeModuleRegistry registry,
+      final JavaScriptModuleRegistry jsModuleRegistry,
+      final JSBundleLoader jsBundleLoader,
+      NativeModuleCallExceptionHandler nativeModuleCallExceptionHandler) {
+
+  	...
+
+    initializeBridge(
+      new BridgeCallback(this),
+      jsExecutor,
+      mReactQueueConfiguration.getJSQueueThread(),
+      mReactQueueConfiguration.getNativeModulesQueueThread(),
+      mJavaRegistry.getJavaModules(this),
+      mJavaRegistry.getCxxModules());
+    FLog.w(ReactConstants.TAG, "Initializing React Xplat Bridge after initializeBridge");
+    mMainExecutorToken = getMainExecutorToken();
+  }
+)
+```
+CatalystInstanceImpl.initializeBridge()传递JS线程与Native线程的调用链为：CatalystInstanceImpl.java的initializeBridge()方法 -> CatalystInstanceImpl.cpp的
+initializeBridge()方法 -> Instance.cpp的initializeBridge()方法，该方法的实现如下所示：
+
+
+```
+void Instance::initializeBridge(
+    std::unique_ptr<InstanceCallback> callback,
+    std::shared_ptr<JSExecutorFactory> jsef,
+    std::shared_ptr<MessageQueueThread> jsQueue,
+    std::unique_ptr<MessageQueueThread> nativeQueue,
+    std::shared_ptr<ModuleRegistry> moduleRegistry) {
+  callback_ = std::move(callback);
+
+  if (!nativeQueue) {
+    // TODO pass down a thread/queue from java, instead of creating our own.
+
+    auto queue = folly::make_unique<CxxMessageQueue>();
+    std::thread t(queue->getUnregisteredRunLoop());
+    t.detach();
+    nativeQueue = std::move(queue);
+  }
+
+  //对应着Java层的MessageQueueThreadImpl jsQueueThread
+  jsQueue->runOnQueueSync(
+    [this, &jsef, moduleRegistry, jsQueue,
+     nativeQueue=folly::makeMoveWrapper(std::move(nativeQueue))] () mutable {
+      nativeToJsBridge_ = folly::make_unique<NativeToJsBridge>(
+          jsef.get(), moduleRegistry, jsQueue, nativeQueue.move(), callback_);
+
+      std::lock_guard<std::mutex> lock(m_syncMutex);
+      m_syncReady = true;
+      m_syncCV.notify_all();
+    });
+
+  CHECK(nativeToJsBridge_);
+}
+···

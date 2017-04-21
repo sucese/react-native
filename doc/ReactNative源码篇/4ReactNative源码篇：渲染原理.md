@@ -26,4 +26,120 @@ star文章, 关注文章的最新的动态。另外建议大家去Github上浏�
 - [4ReactNative源码篇：渲染原理](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/4ReactNative源码篇：渲染原理.md)
 - [5ReactNative源码篇：通信机制](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/5ReactNative源码篇：通信机制.md)
 - [6ReactNative源码篇：线程模型](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/6ReactNative源码篇：线程模型.md)
+
+
+## 工作机制
+
+### 状态机
+
+>RN将所有UI视为一个简单的状态机，任意一个UI场景都是状态机的一种状态。
+
+
+### 生命周期
+
+1 getDefaultProps()
+
+组件首次实例化时初始化默认props属性，多实例共享。
+
+2 getInitialState()
+
+组件实例化时初始化默认的state属性。
+
+3 componentWillMount()
+
+在渲染之前触发一次。
+
+4 render()
+
+渲染函数，返回DOM结构。
+
+5 componentDisMount()
+
+在渲染之后触发一次。
+
+6 componentWillReceiveProps()
+
+组件接收到新的props调用，并将其作为参数nextProps使用，可以在此更改组件state。
+
+7 shouldComponentUpdate()
+
+判断是否需要更新组件
+
+8 componentWillUpdate()
+
+重新渲染前调用
+
+9 componentWillUnmount()
+
+组件移除前调用
+
 																	
+这篇文章我们来分析JSX如何渲染成原生的页面的，在文章- [3ReactNative源码篇：启动流程](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/3ReactNative源码篇：启动流程.md)中
+ReactInstanceManager.setupReactContext()方法中，我们会调用attachMeasuredRootViewToInstance()方法去设置View，我们来回顾一下该方法的实现。
+
+## 渲染原理
+
+
+**举例**
+
+在讲解原理之前，我们先来看一个简单的例子：
+
+```javascript
+import React, { Component } from 'react';
+import {
+  AppRegistry,
+  StyleSheet,
+  Text,
+  View
+} from 'react-native';
+
+//Component用来做UI渲染，生命周期控制，事件分发与回调。
+export default class standard_project extends Component {
+  //render函数返回UI的界面结构（JSX编写，编译完成后最终会变成JS代码）
+  render() {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.welcome}>
+          Welcome to React Native!
+        </Text>
+        <Text style={styles.instructions}>
+          To get started, edit index.android.js
+        </Text>
+        <Text style={styles.instructions}> 
+          Double tap R on your keyboard to reload,{'\n'}
+          Shake or press menu button for dev menu
+        </Text>
+      </View>
+    );
+  }
+}
+
+...
+
+//注册组件名，JS与Java格子各自维护了一个注册表
+AppRegistry.registerComponent('standard_project', () => standard_project);
+```
+
+我们知道render()函数返回的要绘制页面的DOM结构，为了更直观的理解他的实现。
+
+
+```java
+
+public class ReactInstanceManager{
+
+private void attachMeasuredRootViewToInstance(
+      ReactRootView rootView,
+      CatalystInstance catalystInstance) {
+
+	...
+
+    //将ReactRootView作为根布局
+    UIManagerModule uiManagerModule = catalystInstance.getNativeModule(UIManagerModule.class);
+    int rootTag = uiManagerModule.addMeasuredRootView(rootView);
+    //设置相关
+    rootView.setRootViewTag(rootTag);
+
+    ...
+  }
+}
+```
