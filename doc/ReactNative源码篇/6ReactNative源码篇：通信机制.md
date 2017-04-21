@@ -28,7 +28,7 @@ star文章, 关注文章的最新的动态。另外建议大家去Github上浏�
 >通信，指的是RN中Java与JS的通信，即JS中的JSX代码如何转化成Java层真实的View与事件的，以及JavaFile层又是如何调用JS来找出它需要的View与
 事件的。
 
-在上一篇文章[ReactNative源码篇：启动流程](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/2ReactNative源码篇：启动流程.md)中，我们知道RN应用在启动的时候会创建JavaScriptModule注册表（JavaScriptModuleRegistry）与NativeModule注册表（NativeModuleRegistry），RN中Java层
+在上一篇文章[ReactNative源码篇：启动流程](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/3ReactNative源码篇：启动流程.md)中，我们知道RN应用在启动的时候会创建JavaScriptModule注册表（JavaScriptModuleRegistry）与NativeModule注册表（NativeModuleRegistry），RN中Java层
 与JS层的通信就是通过这两张表来完成的，我们来详细看一看。
 
 
