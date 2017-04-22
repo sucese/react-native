@@ -274,7 +274,7 @@ ReactRootView加载进来，并调用RN应用的JS入口APPRegistry来启动应�
 6 JS层找到已经注册的对应的启动组件，执行renderApplication()来渲染整个应用。
 ```
 
-<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/next_java.png"/>
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/next_java.png" width="1000"/>
 
 好，我们先从ReactActivity入手。
 
