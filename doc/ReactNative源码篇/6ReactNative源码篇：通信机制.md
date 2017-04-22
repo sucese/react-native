@@ -407,9 +407,7 @@ Java层代码调用JS层代码，需要将JavaScriptModule注册到JavaScriptMod
 
 CatalystInstanceImpl.getJSModule()调用JavaScriptModuleRegistry.getJavaScriptModule()去查询JavaScriptModule。
 
-************************************************************************************************************************************
-    ***                                                  接下来实现进入Java层                                                   ***
-************************************************************************************************************************************
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/next_java.png"/>
 
 #### 1 JavaScriptModuleRegistry.getJavaScriptModule(CatalystInstance instance, ExecutorToken executorToken, Class<T> moduleInterface)
 
@@ -551,9 +549,7 @@ public class CatalystInstanceImpl{
 
 方法走到这里，实现逻辑已经由Java层转到C++层，我们去C++层看看具体的实现。
 
-************************************************************************************************************************************
-    ***                                                  接下来实现进入C++层                                                    ***
-************************************************************************************************************************************
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/next_c++.png"/>
 
 ### 实现细节（C++层）
 
@@ -690,9 +686,7 @@ void JSCExecutor::bindBridge() throw(JSException) {
 }
 ```
 
-************************************************************************************************************************************
-    ***                                                  接下来实现进入JS层                                                     ***
-************************************************************************************************************************************
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/next_js.png"/>
 
 #### 7 MessageQueue.callFunctionReturnFlushedQueue(module: string, method: string, args: Array<any>)
 

@@ -842,9 +842,7 @@ public class CatalystInstanceImpl {
 
 CatalystInstanceImpl.java最终还是调用C++层的CatalystInstanceImpl.cpp去加载JS Bundle，我们去C++层看一下实现。
 
-************************************************************************************************************************************
-    ***                                                  接下来实现进入C++层                                                    ***
-************************************************************************************************************************************
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/next_c++.png"/>
 
 可以看出该方法最终调用Native方法jniLoadScriptFromAssets去加载JS Bundle，该方法的实现如下所示：
 
@@ -1134,10 +1132,7 @@ bool isEndOfBatch：通知当前的JS Bundle是否处理完成。
 
 JS Bundle加载并解析完成后，ReactContextInitAsyncTask的后台任务完成，进入onPostExecute()方法，我们继续跟进它的实现。
 
-
-************************************************************************************************************************************
-    ***                                                  接下来实现进入Java层                                                   ***
-************************************************************************************************************************************
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/next_java.png"/>
 
 当ReactContext被创建以后，变回继续执行ReactContextInitAsyncTask.onPostExecute()方法。
 
@@ -1252,9 +1247,7 @@ public class ReactInstanceManager {
 
 ```
 
-************************************************************************************************************************************
-    ***                                                  接下来实现进入JS层                                                    ***
-************************************************************************************************************************************
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/next_js.png"/>
 
 ReactInstanceManager.attachMeasuredRootViewToInstance()最终进入了RN应用的启动流程入口，调用catalystInstance.getJSModule(AppRegistry.class).runApplication(jsAppModuleName, appParams)，
 AppRegistry.class是JS层暴露给Java层的接口方法。它的真正实现在AppRegistry.js里，AppRegistry.js是运行所有RN应用的JS层入口，我们来看看它的实现：
