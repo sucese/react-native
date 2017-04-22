@@ -141,7 +141,7 @@ AppRegistry.registerComponent('standard_project', () => standard_project);
 1 RN应用的启动调用流程，各组件完成的功能。
 ```
 
-## 核心概念
+在正式分析启动流程之前，我们先来了解和启动流程相关的一些重要概念。
 
 ### ReactContext
 
@@ -180,9 +180,18 @@ JavaScriptModule：JS暴露给Java调用的API集合，例如：AppRegistry、De
 即可。
 ```
 
-## 启动流程
+好，了解了这些重要概念，我们开始分析整个RN的启动流程。
+
+## JS解析器的实现
+
+
+## RN应用的启动流程
 
 ### 实现概要
+
+>一句话概括启动流程：先是应用终端启动并创建应用上下文，应用上下文启动JS Runtime，进行布局，再由应用终端进行渲染，最后将渲染的View添加到ReactRootView上，最终呈现在用户面前。
+
+详细流程：
 
 ```
 1 在程序启动的时候，也就是ReContextactActivity的onCreate()函数中，我们会去创建一个ReactInstanceManagerImpl对象
@@ -203,7 +212,7 @@ ReactRootView加载进来，并调用RN应用的JS入口APPRegistry来启动应�
 
 ### 实现细节-Java层
 
-好，我们先从ReactActivity入手。😌
+好，我们先从ReactActivity入手。
 
 ReactActivity继承于Activity，并实现了它的生命周期方法。ReactActivity自己并没有做什么事情，所有的功能都由它的委托类ReactActivityDelegate来完成。
 
@@ -443,7 +452,6 @@ ReactInstanceManager.createReactContextInBackground()
 ->ReactInstanceManager.recreateReactContextInBackgroundFromBundleLoader()
 ->ReactInstanceManager.recreateReactContextInBackground(JavaScriptExecutor.Factory jsExecutorFactory, JSBundleLoader jsBundleLoader)
 ->ReactContextInitAsyncTask
-
 
 该方法启动了一个ReactContextInitAsyncTask的异步任务去执行的创建。
 
@@ -1275,5 +1283,7 @@ JSExecutor& executor：即前面我们分析过的JSCExecutor
 folly::dynamic&& calls：解析成功的JS的JSON通信参数结构
 bool isEndOfBatch：通知当前的JS Bundle是否处理完成。
 ```
+
+
 
 

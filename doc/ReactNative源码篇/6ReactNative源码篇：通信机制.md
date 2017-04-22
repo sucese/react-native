@@ -31,8 +31,7 @@ star文章, 关注文章的最新的动态。另外建议大家去Github上浏�
 在上一篇文章[ReactNative源码篇：启动流程](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/3ReactNative源码篇：启动流程.md)中，我们知道RN应用在启动的时候会创建JavaScriptModule注册表（JavaScriptModuleRegistry）与NativeModule注册表（NativeModuleRegistry），RN中Java层
 与JS层的通信就是通过这两张表来完成的，我们来详细看一看。
 
-
-## 核心概念
+在正式开始分析通信机制之前，我们先了解和本篇文章相关的一些重要概念。
 
 在正式介绍通信机制之前，我们先来了解一些核心的概念。
 
@@ -78,6 +77,269 @@ NativeModuleRegistry
 NativeModuleRegistry：Java Module注册表，内部持有Map：Map<Class<? extends NativeModule>, ModuleHolder> mModules，NativeModuleRegistry可以遍历
 并返回Java Module供调用者使用。
 ```
+
+好，了解了这些重要概念，我们开始分析整个RN的通信机制。
+
+## 通信桥的实现
+
+
+在C++层的Executor.h中定义了两个抽象类
+
+ExecutorDelegate：该抽象类用于JS代码调用Native代码。
+
+```c++
+
+// This interface describes the delegate interface required by
+// Executor implementations to call from JS into native code.
+class ExecutorDelegate {
+ public:
+  virtual ~ExecutorDelegate() {}
+
+  virtual void registerExecutor(std::unique_ptr<JSExecutor> executor,
+                                std::shared_ptr<MessageQueueThread> queue) = 0;
+  virtual std::unique_ptr<JSExecutor> unregisterExecutor(JSExecutor& executor) = 0;
+
+  virtual std::shared_ptr<ModuleRegistry> getModuleRegistry() = 0;
+
+  virtual void callNativeModules(
+    JSExecutor& executor, folly::dynamic&& calls, bool isEndOfBatch) = 0;
+  virtual MethodCallResult callSerializableNativeHook(
+    JSExecutor& executor, unsigned int moduleId, unsigned int methodId, folly::dynamic&& args) = 0;
+};
+```
+
+
+
+JSExecutor：正如它的名字那样，它是用来执行JS代码的。执行代码的命令是通过JS层的BatchedBridge传递过来的。
+
+
+我们先来看一下JSExecutor的类图，可以看到
+
+<img src=""/>
+
+可以看到
+
+```c++
+class JSExecutor {
+public:
+  /**
+   * Execute an application script bundle in the JS context.
+   */
+  virtual void loadApplicationScript(std::unique_ptr<const JSBigString> script,
+                                     std::string sourceURL) = 0;
+
+  /**
+   * Add an application "unbundle" file
+   */
+  virtual void setJSModulesUnbundle(std::unique_ptr<JSModulesUnbundle> bundle) = 0;
+
+  /**
+   * Executes BatchedBridge.callFunctionReturnFlushedQueue with the module ID,
+   * method ID and optional additional arguments in JS. The executor is responsible
+   * for using Bridge->callNativeModules to invoke any necessary native modules methods.
+   */
+  virtual void callFunction(const std::string& moduleId, const std::string& methodId, const folly::dynamic& arguments) = 0;
+
+  /**
+   * Executes BatchedBridge.invokeCallbackAndReturnFlushedQueue with the cbID,
+   * and optional additional arguments in JS and returns the next queue. The executor
+   * is responsible for using Bridge->callNativeModules to invoke any necessary
+   * native modules methods.
+   */
+  virtual void invokeCallback(const double callbackId, const folly::dynamic& arguments) = 0;
+
+  virtual void setGlobalVariable(std::string propName,
+                                 std::unique_ptr<const JSBigString> jsonValue) = 0;
+  virtual void* getJavaScriptContext() {
+    return nullptr;
+  }
+  virtual bool supportsProfiling() {
+    return false;
+  }
+  virtual void startProfiler(const std::string &titleString) {}
+  virtual void stopProfiler(const std::string &titleString, const std::string &filename) {}
+  virtual void handleMemoryPressureUiHidden() {}
+  virtual void handleMemoryPressureModerate() {}
+  virtual void handleMemoryPressureCritical() {
+    handleMemoryPressureModerate();
+  }
+  virtual void destroy() {}
+  virtual ~JSExecutor() {}
+};
+```
+
+
+在C++层的NativeToJsBridge.h定义了两个抽象类
+
+JsToNativeBridge：该类继承于抽象类ExecutorDelegate，用于JS代码调用Native代码，JsToNativeBridge.cpp实现了该抽象类里的方法。
+
+```c++
+class JsToNativeBridge;
+```
+
+JsToNativeBridge：该抽象类用于Native代码调用JS代码，JsToNativeBridge.cpp实现了该抽象类里的方法。
+
+NativeToJsBridge
+
+```c++
+// This class manages calls from native code to JS.  It also manages
+// executors and their threads.  All functions here can be called from
+// any thread.
+//
+// Except for loadApplicationScriptSync(), all void methods will queue
+// work to run on the jsQueue passed to the ctor, and return
+// immediately.
+class NativeToJsBridge {
+public:
+  //friend关键字，JsToNativeBridge是NativeToJsBridge的友元函数，友元类的每个成员函数都可以访问两另一个类的所有成员。
+  friend class JsToNativeBridge;
+
+  /**
+   * 构造函数，需要在JS线程中调用。
+   *  
+   * This must be called on the main JS thread.
+   */
+  NativeToJsBridge(
+      JSExecutorFactory* jsExecutorFactory,
+      std::shared_ptr<ModuleRegistry> registry,
+      std::shared_ptr<MessageQueueThread> jsQueue,
+      std::unique_ptr<MessageQueueThread> nativeQueue,
+      std::shared_ptr<InstanceCallback> callback);
+  virtual ~NativeToJsBridge();
+
+  /**
+   * 通过module ID、method ID与arguments异步调用JS层的方法。
+   *  
+   * Executes a function with the module ID and method ID and any additional
+   * arguments in JS.
+   */
+  void callFunction(
+    ExecutorToken executorToken,
+    std::string&& module,
+    std::string&& method,
+    folly::dynamic&& args);
+
+  /**
+   * 通过callbackId与arguments调用callback
+   * 
+   * Invokes a callback with the cbID, and optional additional arguments in JS.
+   */
+  void invokeCallback(ExecutorToken executorToken, double callbackId, folly::dynamic&& args);
+
+  /**
+   * 通过module ID、method ID与arguments同步调用JS层的方法。
+   *
+   * Executes a JS method on the given executor synchronously, returning its
+   * return value.  JSException will be thrown if JS throws an exception;
+   * another standard exception may be thrown for C++ bridge failures, or if
+   * the executor is not capable of synchronous calls.
+   *
+   * This method is experimental, and may be modified or removed.
+   *
+   * loadApplicationScriptSync() must be called and finished executing
+   * before callFunctionSync().
+   */
+  template <typename T>
+  Value callFunctionSync(const std::string& module, const std::string& method, T&& args) {
+    if (*m_destroyed) {
+      throw std::logic_error(
+        folly::to<std::string>("Synchronous call to ", module, ".", method,
+                               " after bridge is destroyed"));
+    }
+
+    JSCExecutor *jscExecutor = dynamic_cast<JSCExecutor*>(m_mainExecutor);
+    if (!jscExecutor) {
+      throw std::invalid_argument(
+        folly::to<std::string>("Executor type ", typeid(*m_mainExecutor).name(),
+                               " does not support synchronous calls"));
+    }
+
+    return jscExecutor->callFunctionSync(module, method, std::forward<T>(args));
+  }
+
+  /**
+   * 异步启动JS应用
+   *
+   * Starts the JS application.  If unbundle is non-null, then it is
+   * used to fetch JavaScript modules as individual scripts.
+   * Otherwise, the script is assumed to include all the modules.
+   */
+  void loadApplication(
+    std::unique_ptr<JSModulesUnbundle> unbundle,
+    std::unique_ptr<const JSBigString> startupCode,
+    std::string sourceURL);
+  /**
+   * 同步启动JS应用
+   */
+  void loadApplicationSync(
+    std::unique_ptr<JSModulesUnbundle> unbundle,
+    std::unique_ptr<const JSBigString> startupCode,
+    std::string sourceURL);
+ /**
+   * 设置全局变量，供其他层代码调用。
+   */
+  void setGlobalVariable(std::string propName, std::unique_ptr<const JSBigString> jsonValue);
+  void* getJavaScriptContext();
+  bool supportsProfiling();
+  void startProfiler(const std::string& title);
+  void stopProfiler(const std::string& title, const std::string& filename);
+  void handleMemoryPressureUiHidden();
+  void handleMemoryPressureModerate();
+  void handleMemoryPressureCritical();
+
+  /**
+   * Returns the ExecutorToken corresponding to the main JSExecutor.
+   */
+  ExecutorToken getMainExecutorToken() const;
+
+  /**
+   * Synchronously tears down the bridge and the main executor.
+   */
+  void destroy();
+private:
+  /**
+   * Registers the given JSExecutor which runs on the given MessageQueueThread
+   * with the NativeToJsBridge. Part of this registration is transfering
+   * ownership of this JSExecutor to the NativeToJsBridge for the duration of
+   * the registration.
+   *
+   * Returns a ExecutorToken which can be used to refer to this JSExecutor
+   * in the NativeToJsBridge.
+   */
+  ExecutorToken registerExecutor(
+      ExecutorToken token,
+      std::unique_ptr<JSExecutor> executor,
+      std::shared_ptr<MessageQueueThread> executorMessageQueueThread);
+
+  /**
+   * Unregisters a JSExecutor that was previously registered with this NativeToJsBridge
+   * using registerExecutor.
+   */
+  std::unique_ptr<JSExecutor> unregisterExecutor(JSExecutor& executorToken);
+
+  void runOnExecutorQueue(ExecutorToken token, std::function<void(JSExecutor*)> task);
+
+  // This is used to avoid a race condition where a proxyCallback gets queued
+  // after ~NativeToJsBridge(), on the same thread. In that case, the callback
+  // will try to run the task on m_callback which will have been destroyed
+  // within ~NativeToJsBridge(), thus causing a SIGSEGV.
+  std::shared_ptr<bool> m_destroyed;
+  JSExecutor* m_mainExecutor;
+  ExecutorToken m_mainExecutorToken;
+  std::shared_ptr<JsToNativeBridge> m_delegate;
+  std::unordered_map<JSExecutor*, ExecutorToken> m_executorTokenMap;
+  std::unordered_map<ExecutorToken, ExecutorRegistration> m_executorMap;
+  std::mutex m_registrationMutex;
+  #ifdef WITH_FBSYSTRACE
+  std::atomic_uint_least32_t m_systraceCookie = ATOMIC_VAR_INIT();
+  #endif
+
+  MessageQueueThread* getMessageQueueThread(const ExecutorToken& executorToken);
+  JSExecutor* getExecutor(const ExecutorToken& executorToken);
+  ExecutorToken getTokenForExecutor(JSExecutor& executor);
+};
+```
+
 
 ## Java层调用JS层li
 
@@ -1325,8 +1587,3 @@ class MessageQueue {
 事件到达Java层后调用NativeModulesReactCallback.call()方法。
 
 ``
-
-
-
-
-
