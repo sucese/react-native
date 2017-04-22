@@ -27,3 +27,156 @@ star文章, 关注文章的最新的动态。另外建议大家去Github上浏�
 - [5ReactNative源码篇：线程模型](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/5ReactNative源码篇：线程模型.md)
 - [6ReactNative源码篇：通信机制](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/6ReactNative源码篇：通信机制.md)
 								
+我们都知道如果需要用Java调用C/C++，需要用到Java中的JNI，但是用过JNI的同学都知道这是个繁琐且低效的调用方式，在大型工程体现的更加明显，因为我们需要将Java与C/C++的
+相互访问与通信框架化，形成更高层次的封装，避免直接使用原始的JNI反射API去做调用。
+
+RN框架便有着优秀的Java与Native访问框架，这套框架的核心在于JNI智能指针，我们来详细的看一看它的实现原理。
+
+Java对象（jobject）在Native层有3种引用类型：
+
+全局引用
+
+```
+全局引用：使用NewGlobalRef创建，使用DeleteGlobalRef销毁。支持跨线程访问，在调用DeleteGlobalRef销毁前，GC无法回收该引用对应的Java Object。
+```
+
+局部引用
+
+```
+局部引用：使用NewLocalRef创建，使用DeleteLocalRef销毁。只能在本线程内安全访问，当创建该引用的Native调用链返回至JVM时，未被销毁的局部引用可以被GC回收，但是局部引用表容量有限，应该
+在返回JVM前，调用DeleteLocalRef先行销毁，避免局部引用表超限引用崩溃。
+```
+
+弱全局引用
+
+```
+局部引用：使用NewWeekGlobalRef创建，使用DeleteWeekGlobalRef销毁。与全局引用一样具有全局作用域，但是不会影响GC回收，GC可以随时回收该引用。
+```
+
+JNI动态注册
+
+JNI在注册Native函数时，可以利用javah命令生成函数签名，而静态注册就是利用这些函数名在JNI层中寻找着写函数，如果没有找到就会报错，如果找到了就会建立一个关联关系，以后
+在调用时就会直接调用这个函数，该操作有虚拟机来完成。但是每次调用都要进行查找的做法效率比较低，因而便衍生了动态注册的方法。
+
+动态注册
+
+>动态注册允许你提供一个函数映射表，提供给虚拟机，这样虚拟机就可以根据函数映射表来调用相应的函数。
+
+函数映射表中函数的结构如下所示：
+
+```c
+typedef struct { 
+const char* name; //Java中Native方法的名字
+const char* signature; //Java中Native方法的参数和返回值。
+void* fnPtr; //函数指针，指向C函数
+} JNINativeMethod; 
+```
+
+JNI_OnLoad()函数在System.loadLibrary加载完JNI动态库后会自动调用，我们在这里完成动态注册工作，该函数有2个作用：
+
+```
+1 指定JNI版本，告诉虚拟机应该使用哪一个JNI版本。
+2 注册Native函数，调用方法jint RegisterNatives(jclass clazz, const JNINativeMethod* methods,jint nMethods)来实现。
+```
+
+我们来看一个简单的例子。
+
+1 在Java层编写本地方法
+
+```java
+public class HelloJni { 
+
+	static {
+        System.loadLibrary("hello-jni");
+    }
+
+    public static final main(String[] args){
+    	System.out.println(stringFromJNI());
+    }
+
+    public native String stringFromJNI();
+}
+```
+
+2 在JNI中进行动态注册
+
+```c
+#include <stdlib.h>  
+#include <string.h>  
+#include <stdio.h>  
+#include <jni.h>  
+#include <assert.h>  
+  
+/* This is a trivial JNI example where we use a native method 
+ * to return a new VM String. See the corresponding Java source 
+ * file located at: 
+ * 
+ *   apps/samples/hello-jni/project/src/com/example/HelloJni/HelloJni.java 
+ */  
+jstring native_hello(JNIEnv* env, jobject thiz)  
+{  
+    return (*env)->NewStringUTF(env, "动态注册JNI");  
+}  
+  
+/** 
+* 方法对应表 
+*/  
+static JNINativeMethod gMethods[] = {  
+    {"stringFromJNI", "()Ljava/lang/String;", (void*)native_hello},
+};  
+  
+/* 
+* 为某一个类注册本地方法 
+*/  
+static int registerNativeMethods(JNIEnv* env  
+        , const char* className  
+        , JNINativeMethod* gMethods, int numMethods) {  
+    jclass clazz;  
+    clazz = (*env)->FindClass(env, className);  
+    if (clazz == NULL) {  
+        return JNI_FALSE;  
+    }  
+    if ((*env)->RegisterNatives(env, clazz, gMethods, numMethods) < 0) {  
+        return JNI_FALSE;  
+    }  
+  
+    return JNI_TRUE;  
+}  
+  
+  
+/* 
+* 为所有类注册本地方法 
+*/  
+static int registerNatives(JNIEnv* env) {
+	//指定要注册的类
+    const char* kClassName = "com/example/hellojni/HelloJni";
+    return registerNativeMethods(env, kClassName, gMethods,  
+            sizeof(gMethods) / sizeof(gMethods[0]));  
+}  
+  
+/* 
+* System.loadLibrary("lib")时调用自动调用JNI_OnLoad
+* 如果成功返回JNI版本, 失败返回-1 
+*/  
+JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {  
+    JNIEnv* env = NULL;  
+    jint result = -1;  
+  
+    if ((*vm)->GetEnv(vm, (void**) &env, JNI_VERSION_1_4) != JNI_OK) {  
+        return -1;  
+    }  
+    assert(env != NULL);  
+  
+    if (!registerNatives(env)) {//注册  
+        return -1;  
+    }  
+    //成功  
+    result = JNI_VERSION_1_4;  
+  
+    return result;  
+} 
+```
+
+
+这部分内容牵扯到JNI的动态注册，我们先简单回忆一下动态注册的相关内容：
+

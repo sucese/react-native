@@ -143,6 +143,8 @@ AppRegistry.registerComponent('standard_project', () => standard_project);
 
 ## 核心概念
 
+### ReactContext
+
 整个启动流程重要创建实例之一就是ReactContext，在正式介绍启动流程之前，我们先来了接一下ReactContext的概念。
 
 >ReactContext继承于ContextWrapper，也就是说它和Android中的Context是一个概念，是整个应用的上下文。那么什么是上下文呢，我们知道Android的应用模型是基于组件的应用设计模式，
@@ -162,6 +164,20 @@ AppRegistry.registerComponent('standard_project', () => standard_project);
 ```
 ReactApplicationContext：继承于ReactContext，ReactContext的wrapper类，就像Context与ContextWrapper的关系一样。
 ThemedReactContext：继承于ReactContext，也是ReactContext的wrapper类。
+```
+
+### NativeModule/UIManagerModule/JavascriptModule
+
+Module即模块，是暴露给对方调用的API集合。
+
+NativeModule/UIManagerModule
+
+```
+NativeModule/UIManagerModule：NativeModule是Java暴露给JS调用的APU集合，例如：ToastModule、DialogModule等，UIManagerModule也是供JS调用的API集合，它用来创建View。
+业务放可以通过实现NativeModule来自定义模块，通过getName()将模块名暴露给JS层，通过@ReactMethod注解将API暴露给JS层。
+
+JavaScriptModule：JS暴露给Java调用的API集合，例如：AppRegistry、DeviceEventEmitter等。业务放可以通过继承JavaScriptModule接口类似自定义接口模块，声明与JS相对应的方法
+即可。
 ```
 
 ## 启动流程
@@ -408,6 +424,7 @@ public class ReactInstanceManager {
       mReactContextInitAsyncTask = new ReactContextInitAsyncTask();
       mReactContextInitAsyncTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, initParams);
     } else {
+      //创建ReactContext的后台任务已经开启，缓存initParams在队列中等待重新创建ReactContext
       // Background task is currently running, queue up most recent init params to recreate context
       // once task completes.
       mPendingReactContextInitParams = initParams;
@@ -467,51 +484,16 @@ ReactContextInitAsyncTask的doInBackground()方法里调用ReactInstanceManager.
 我们重点来看看传入ReactInstanceManager.createReactContext()的2个参数：
 
 ```
-JavaScriptExecutor jsExecutor：JS执行器，将JS的调用传递给C++层。
-JSBundleLoader jsBundleLoader：JS bundle加载器，不同的场景会创建不同的加载器，具体可以查看类JSBundleLoader。
+JSCJavaScriptExecutor jsExecutor：JSCJavaScriptExecutor继承于JavaScriptExecutor，当该类被加载时，它会自动去加载"reactnativejnifb.so"库，并会调用Native方
+法initHybrid()初始化C++层RN与JSC通信的框架。
+
+JSBundleLoader jsBundleLoader：缓存了JSBundle的信息，封装了上层加载JSBundle的相关接口，CatalystInstance通过其简介调用ReactBridge去加载JS文件，不同的场景会创建
+不同的加载器，具体可以查看类JSBundleLoader。
 ```
 
 这两个参数是ReactInstanceManager.recreateReactContextInBackground()创建ReactContextInitAsyncTask传递进来的，有两个地方调用了ReactInstanceManager.recreateReactContextInBackground()
-方法，不同模式获取JS Bundle的方法不一样，jsBundleLoader的创建方式也不一样，如下所示：
+方法，
 
-```
-public class ReactInstanceManager {
-
-  private void onReloadWithJSDebugger(JavaJSExecutor.Factory jsExecutorFactory) {
-    recreateReactContextInBackground(
-        new ProxyJavaScriptExecutor.Factory(jsExecutorFactory),
-        JSBundleLoader.createRemoteDebuggerBundleLoader(
-            mDevSupportManager.getJSBundleURLForRemoteDebugging(),
-            mDevSupportManager.getSourceUrl()));
-  }
-
-  private void onJSBundleLoadedFromServer() {
-    recreateReactContextInBackground(
-        new JSCJavaScriptExecutor.Factory(mJSCConfig.getConfigMap()),
-        JSBundleLoader.createCachedBundleFromNetworkLoader(
-            mDevSupportManager.getSourceUrl(),
-            mDevSupportManager.getDownloadedJSBundleFile()));
-  }
-
-  private void recreateReactContextInBackground(
-      JavaScriptExecutor.Factory jsExecutorFactory,
-      JSBundleLoader jsBundleLoader) {
-    UiThreadUtil.assertOnUiThread();
-
-    ReactContextInitParams initParams =
-        new ReactContextInitParams(jsExecutorFactory, jsBundleLoader);
-    if (mReactContextInitAsyncTask == null) {
-      // No background task to create react context is currently running, create and execute one.
-      mReactContextInitAsyncTask = new ReactContextInitAsyncTask();
-      mReactContextInitAsyncTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, initParams);
-    } else {
-      // Background task is currently running, queue up most recent init params to recreate context
-      // once task completes.
-      mPendingReactContextInitParams = initParams;
-    }
-  }
-}
-```
 接下来调用ReactInstanceManager.createReactContext()，真正开始创建ReactContext。
 
 #### 5 ReactInstanceManager.createReactContext( JavaScriptExecutor jsExecutor, JSBundleLoader jsBundleLoader)
@@ -637,7 +619,15 @@ public class ReactInstanceManager {
 4 关联ReactContext与CatalystInstance，并将JS Bundle加载进来，等待ReactContextInitAsyncTask结束以后调用JS入口渲染页面。
 ```
 
-我们再来看看CatalystInstanceImpl的创建流程。
+该函数的最后调用CatalystInstance.runJSBundle()去加载JS Bundle，该加载过程的函数调用链如下所示：
+
+```java
+
+CatalystInstance.runJSBundle() -> JSBundleLoader.loadScript() -> CatalystInstance.jniLoadScriptFromAssets()/jniLoadScriptFromFile()
+-> CatalystInstance::jniLoadScriptFromAssets()/jniLoadScriptFromFile() -> Instance::loadScriptFromString()/loadScriptFromFile()
+-> NativeToJsBridge::loadApplication() -> JSCExecutor::loadApplicationScript()
+```
+最终由C++中的JSCExecutor.cpp完成了JS Bundle的加载，核心逻辑都在JSCExecutor.cpp中，这一块的内容我们后续的文章在详细分析，我们先来看看CatalystInstanceImpl的创建流程。
 
 #### 6 CatalystInstanceImpl.CatalystInstanceImpl( final ReactQueueConfigurationSpec ReactQueueConfigurationSpec, final JavaScriptExecutor jsExecutor, final NativeModuleRegistry registry, final JavaScriptModuleRegistry jsModuleRegistry, final JSBundleLoader jsBundleLoader, NativeModuleCallExceptionHandler nativeModuleCallExceptionHandler) 
 
@@ -752,7 +742,7 @@ callback:JInstanceCallback的实现类。
 
 ```
 
-当ReactContext被创建以后，变回继续执行ReactContextInitAsyncTask.ononPostExecute()方法。
+当ReactContext被创建以后，变回继续执行ReactContextInitAsyncTask.onPostExecute()方法。
 
 #### 6 ReactInstanceManager.ReactContextInitAsyncTask.onPostExecute(Result<ReactApplicationContext> result)
 
