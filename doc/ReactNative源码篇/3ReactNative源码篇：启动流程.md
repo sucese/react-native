@@ -184,6 +184,94 @@ JavaScriptModule：JS暴露给Java调用的API集合，例如：AppRegistry、De
 
 ## JS解析器的实现
 
+JS的解析是在Webkit-JavaScriptCore中完成的，JSCExexutor.cpp对JavaScriptCore的功能做了进一步的封装，我们来看一下它的实现。
+
+在C++层的Executor.h中定义了两个抽象类
+
+ExecutorDelegate：该抽象类用于JS代码调用Native代码。
+
+```c++
+
+// This interface describes the delegate interface required by
+// Executor implementations to call from JS into native code.
+class ExecutorDelegate {
+ public:
+  virtual ~ExecutorDelegate() {}
+
+  virtual void registerExecutor(std::unique_ptr<JSExecutor> executor,
+                                std::shared_ptr<MessageQueueThread> queue) = 0;
+  virtual std::unique_ptr<JSExecutor> unregisterExecutor(JSExecutor& executor) = 0;
+
+  virtual std::shared_ptr<ModuleRegistry> getModuleRegistry() = 0;
+
+  virtual void callNativeModules(
+    JSExecutor& executor, folly::dynamic&& calls, bool isEndOfBatch) = 0;
+  virtual MethodCallResult callSerializableNativeHook(
+    JSExecutor& executor, unsigned int moduleId, unsigned int methodId, folly::dynamic&& args) = 0;
+};
+```
+
+
+
+JSExecutor：正如它的名字那样，它是用来执行JS代码的。执行代码的命令是通过JS层的BatchedBridge传递过来的。
+
+
+我们先来看一下JSExecutor的类图，可以看到
+
+<img src=""/>
+
+可以看到
+
+```c++
+class JSExecutor {
+public:
+  /**
+   * Execute an application script bundle in the JS context.
+   */
+  virtual void loadApplicationScript(std::unique_ptr<const JSBigString> script,
+                                     std::string sourceURL) = 0;
+
+  /**
+   * Add an application "unbundle" file
+   */
+  virtual void setJSModulesUnbundle(std::unique_ptr<JSModulesUnbundle> bundle) = 0;
+
+  /**
+   * Executes BatchedBridge.callFunctionReturnFlushedQueue with the module ID,
+   * method ID and optional additional arguments in JS. The executor is responsible
+   * for using Bridge->callNativeModules to invoke any necessary native modules methods.
+   */
+  virtual void callFunction(const std::string& moduleId, const std::string& methodId, const folly::dynamic& arguments) = 0;
+
+  /**
+   * Executes BatchedBridge.invokeCallbackAndReturnFlushedQueue with the cbID,
+   * and optional additional arguments in JS and returns the next queue. The executor
+   * is responsible for using Bridge->callNativeModules to invoke any necessary
+   * native modules methods.
+   */
+  virtual void invokeCallback(const double callbackId, const folly::dynamic& arguments) = 0;
+
+  virtual void setGlobalVariable(std::string propName,
+                                 std::unique_ptr<const JSBigString> jsonValue) = 0;
+  virtual void* getJavaScriptContext() {
+    return nullptr;
+  }
+  virtual bool supportsProfiling() {
+    return false;
+  }
+  virtual void startProfiler(const std::string &titleString) {}
+  virtual void stopProfiler(const std::string &titleString, const std::string &filename) {}
+  virtual void handleMemoryPressureUiHidden() {}
+  virtual void handleMemoryPressureModerate() {}
+  virtual void handleMemoryPressureCritical() {
+    handleMemoryPressureModerate();
+  }
+  virtual void destroy() {}
+  virtual ~JSExecutor() {}
+};
+```
+
+
 
 ## RN应用的启动流程
 
