@@ -35,44 +35,46 @@ star文章, 关注文章的最新的动态。另外建议大家去Github上浏�
 
 在正式介绍通信机制之前，我们先来了解一些核心的概念。
 
-### JavaScript Module注册表
+**JavaScript Module注册表**
 
 说起JavaScript Module注册表，我们需要先理解3个类/接口：JavaScriptModule、JavaScriptModuleRegistration、JavaScriptModuleRegistry。
 
-JavaScriptModule
+**JavaScriptModule**
 
 ```
 JavaScriptModule：这是一个接口，JS Module都会继承此接口，它表示在JS层会有一个相同名字的js文件，该js文件实现了该接口定义的方法，JavaScriptModuleRegistry会利用
 动态代理将这个接口生成代理类，并通过C++传递给JS层，进而调用JS层的方法。
 ```
-JavaScriptModuleRegistration
+**JavaScriptModuleRegistration**
 
 ```
 JavaScriptModuleRegistration用来描述JavaScriptModule的相关信息，它利用反射获取接口里定义的Method。
 ```
-JavaScriptModuleRegistry
+**JavaScriptModuleRegistry**
 
 ```
 JavaScriptModuleRegistry：JS Module注册表，内部维护了一个HashMap：HashMap<Class<? extends JavaScriptModule>, JavaScriptModuleRegistration> mModuleRegistrations，
 JavaScriptModuleRegistry利用动态代理生成接口JavaScriptModule对应的代理类，再通过C++传递到JS层，从而调用JS层的方法。
 ```
 
-### Java Module注册表
+**Java Module注册表**
 
 要理解Java Module注册表，我们同样也需要理解3个类/接口：NativeModule、ModuleHolder、NativeModuleRegistry。
 
-NativeModule
+**NativeModule**
 
 ```
 NativeModule：是一个接口，实现了该接口则可以被JS层调用，我们在为JS层提供Java API时通常会继承BaseJavaModule/ReactContextBaseJavaModule，这两个类就
 实现了NativeModule接口。
 ```
-ModuleHolder
+**ModuleHolder**
 
 ```
 ModuleHolder：NativeModule的一个Holder类，可以实现NativeModule的懒加载。
 ```
-NativeModuleRegistry
+
+**NativeModuleRegistry**
+
 ```
 NativeModuleRegistry：Java Module注册表，内部持有Map：Map<Class<? extends NativeModule>, ModuleHolder> mModules，NativeModuleRegistry可以遍历
 并返回Java Module供调用者使用。
@@ -80,14 +82,61 @@ NativeModuleRegistry：Java Module注册表，内部持有Map：Map<Class<? exte
 
 好，了解了这些重要概念，我们开始分析整个RN的通信机制。
 
-## 通信桥的实现
+## 一 通信桥的实现
 
-在C++层的NativeToJsBridge.h定义了两个抽象类
+ExecutorDelegate：在Executor.h中定义，由JsToNativeBridge实现，该抽象类用于JS代码调用Native代码，该类的类图如下所示：
+
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/6/UMLClassDiagram-ExecutorDelegate.png"/>
+
+
+```c++
+
+// This interface describes the delegate interface required by
+// Executor implementations to call from JS into native code.
+class ExecutorDelegate {
+ public:
+  virtual ~ExecutorDelegate() {}
+
+  virtual void registerExecutor(std::unique_ptr<JSExecutor> executor,
+                                std::shared_ptr<MessageQueueThread> queue) = 0;
+  virtual std::unique_ptr<JSExecutor> unregisterExecutor(JSExecutor& executor) = 0;
+
+  virtual std::shared_ptr<ModuleRegistry> getModuleRegistry() = 0;
+
+  virtual void callNativeModules(
+    JSExecutor& executor, folly::dynamic&& calls, bool isEndOfBatch) = 0;
+  virtual MethodCallResult callSerializableNativeHook(
+    JSExecutor& executor, unsigned int moduleId, unsigned int methodId, folly::dynamic&& args) = 0;
+};
+```
 
 JsToNativeBridge：该类继承于抽象类ExecutorDelegate，用于JS代码调用Native代码，JsToNativeBridge.cpp实现了该抽象类里的方法。
 
 ```c++
 class JsToNativeBridge;
+```
+
+ExecutorDelegate：该抽象类用于JS代码调用Native代码。
+
+```c++
+
+// This interface describes the delegate interface required by
+// Executor implementations to call from JS into native code.
+class ExecutorDelegate {
+ public:
+  virtual ~ExecutorDelegate() {}
+
+  virtual void registerExecutor(std::unique_ptr<JSExecutor> executor,
+                                std::shared_ptr<MessageQueueThread> queue) = 0;
+  virtual std::unique_ptr<JSExecutor> unregisterExecutor(JSExecutor& executor) = 0;
+
+  virtual std::shared_ptr<ModuleRegistry> getModuleRegistry() = 0;
+
+  virtual void callNativeModules(
+    JSExecutor& executor, folly::dynamic&& calls, bool isEndOfBatch) = 0;
+  virtual MethodCallResult callSerializableNativeHook(
+    JSExecutor& executor, unsigned int moduleId, unsigned int methodId, folly::dynamic&& args) = 0;
+};
 ```
 
 JsToNativeBridge：该抽象类用于Native代码调用JS代码，JsToNativeBridge.cpp实现了该抽象类里的方法。
@@ -253,8 +302,7 @@ private:
 };
 ```
 
-
-## Java层调用JS层li
+## 二 Java层调用JS层
 
 **举例**
 
@@ -332,13 +380,12 @@ C++层
 6 JSCExecutor.cpp的callFunction()方法通过Webkit JSC调用JS层的MessageQueue.js里的callFunctionReturnFlushedQueue()方法，自此整个流程转入JavaScript层。
 ```
 
-JavaScript层
+JS层
 
 ```
 7 MessageQueue.js里的callFunctionReturnFlushedQueue()方法，该方法按照调用链：MessageQueue.callFunctionReturnFlushedQueue()->MessageQueue.__callFunction()
 在JS层里的JavaScriptModule注册表里产找对应的JavaScriptModule及方法。
 ```
-
 
 我们来分析上述代码的调用方式。
 
@@ -353,12 +400,16 @@ CatalystInstanceImpl.getJSModule(xxx.class).method(params, params, ...);
 
 当然，如果使我们调用自己的JS Module，我们是用ReactContext.getJSModule()，因为ReactContext持有CatalystInstanceImpl的实例，CatalystInstanceImpl并不直接对外公开。
 
-### 实现细节-Java层
+### 实现细节
 
 Java层代码调用JS层代码，需要将JavaScriptModule注册到JavaScriptModuleRegistry中，然后通过动态代理获取方法的各种参数，再将参数通过参数通过C++层传递到JS层从而完成调用，我们
 先来看看CatalystInstanceImpl是如何拿到JavaScriptModule的。
 
 CatalystInstanceImpl.getJSModule()调用JavaScriptModuleRegistry.getJavaScriptModule()去查询JavaScriptModule。
+
+************************************************************************************************************************************
+    ***                                                  接下来实现进入Java层                                                   ***
+************************************************************************************************************************************
 
 #### 1 JavaScriptModuleRegistry.getJavaScriptModule(CatalystInstance instance, ExecutorToken executorToken, Class<T> moduleInterface)
 
@@ -500,7 +551,11 @@ public class CatalystInstanceImpl{
 
 方法走到这里，实现逻辑已经由Java层转到C++层，我们去C++层看看具体的实现。
 
-### 实现细节-C++层
+************************************************************************************************************************************
+    ***                                                  接下来实现进入C++层                                                    ***
+************************************************************************************************************************************
+
+### 实现细节（C++层）
 
 CatalystInstanceImpl.java在C++层有个对应的类CatalystInstanceImpl.cpp。
 
@@ -615,61 +670,14 @@ void JSCExecutor::callFunction(const std::string& moduleId, const std::string& m
     }
   }();
 
+  //将调用结果返回给Java层
   callNativeModules(std::move(result));
 }
 
-void JSCExecutor::callNativeModules(Value&& value) {
-  SystraceSection s("JSCExecutor::callNativeModules");
-  try {
-    auto calls = value.toJSONString();
-    //m_delegate的类型是ExecutorDelegate，事实上它调用的是ExecutorDelegate的子类JsToNativeBridge.cpp的callNativeModules()方法
-    m_delegate->callNativeModules(*this, folly::parseJson(calls), true);
-  } catch (...) {
-    std::string message = "Error in callNativeModules()";
-    try {
-      message += ":" + value.toString().str();
-    } catch (...) {
-      // ignored
-    }
-    std::throw_with_nested(std::runtime_error(message));
-  }
-}
 ```
 
-可以看出，JSCExecutor.cpp按照调用链：JSCExecutor::callFunction()->JSCExecutor::callNativeModules(Value&& value)->JsToNativeBridge::callNativeModules()方法
-进一步调用JsToNativeBridge.cpp的callNativeModules()方法，注意这里传入的isEndOfBatch=true，我们以后会讲JS代码调用Java代码，最终也会走到这里，只是传入的isEndOfBatch=false。
-
-#### 7 JsToNativeBridge.callNativeModules(JSExecutor& executor, folly::dynamic&& calls, bool isEndOfBatch)
-
-**JsToNativeBridge.cpp**
-
-```c++
-  void callNativeModules(
-      JSExecutor& executor, folly::dynamic&& calls, bool isEndOfBatch) override {
-
-    CHECK(m_registry || calls.empty()) <<
-      "native module calls cannot be completed with no native modules";
-    ExecutorToken token = m_nativeToJs->getTokenForExecutor(executor);
-    m_nativeQueue->runOnQueue([this, token, calls=std::move(calls), isEndOfBatch] () mutable {
-      // An exception anywhere in here stops processing of the batch.  This
-      // was the behavior of the Android bridge, and since exception handling
-      // terminates the whole bridge, there's not much point in continuing.
-      for (auto& call : react::parseMethodCalls(std::move(calls))) {
-        m_registry->callNativeMethod(
-          token, call.moduleId, call.methodId, std::move(call.arguments), call.callId);
-      }
-      if (isEndOfBatch) {
-        m_callback->onBatchComplete();
-        m_callback->decrementPendingJSCalls();
-      }
-    });
-  }
-
-```
-
-我们先来解释下m_callFunctionReturnFlushedQueueJS这个变量的由来，它在JSCExecutor::bindBridge()里初始化，本质上就是通过Webkit JSC拿到JS层代码相关对象
-和方法引用，m_callFunctionReturnFlushedQueueJS就是MessageQueue.js里的callFunctionReturnFlushedQueue()方法的引用。
-
+可以看出，该函数进一步调用m_callFunctionReturnFlushedQueueJS->callAsFunction()，我们先来解释下m_callFunctionReturnFlushedQueueJS这个变量的由来，它在JSCExecutor::bindBridge()里
+初始化，本质上就是通过Webkit JSC拿到JS层代码相关对象和方法引用，m_callFunctionReturnFlushedQueueJS就是MessageQueue.js里的callFunctionReturnFlushedQueue()方法的引用。
 
 ```c++
 void JSCExecutor::bindBridge() throw(JSException) {
@@ -682,7 +690,9 @@ void JSCExecutor::bindBridge() throw(JSException) {
 }
 ```
 
-### 实现细节-JavaScript层
+************************************************************************************************************************************
+    ***                                                  接下来实现进入JS层                                                     ***
+************************************************************************************************************************************
 
 #### 7 MessageQueue.callFunctionReturnFlushedQueue(module: string, method: string, args: Array<any>)
 
@@ -726,6 +736,8 @@ MessageQueue.callFunctionReturnFlushedQueue()方法的实现如下所示：
     return result;
   }
 ```
+
+从JS层的JavaScriptModule注册表中查找到AppRegistry.js，最终调用AppRegistry.js的runApplication()方法。
 
 好，以上就是Java层代码调用JS层代码的全部流程，我们再来总结一下：
 
@@ -1366,28 +1378,6 @@ public class JavaModuleWrapper {
 }
 ```
 
-自此，JS代码完成了对Java代码的调用，我们再来总结一下整个流程。
-
-JS层
-
-```
-1 JS代码主动调用Java层实现的相关方法，将管管方法添加到JS队列等待Java层主动拉取或者调用
-```
-
-C++层
-
-```
-```
-
-Java层
-
-```
-```
-
-
-
-
-
 JavaModuleWrapper对应C++层的NativeModule，该类针对Java BaseJavaModule进行了包装，是的C++层可以更加方便的通过JNI调用Java Module。
 
 
@@ -1500,3 +1490,22 @@ class MessageQueue {
 事件到达Java层后调用NativeModulesReactCallback.call()方法。
 
 ``
+
+自此，JS代码完成了对Java代码的调用，我们再来总结一下整个流程。
+
+JS层
+
+```
+1 JS代码主动调用Java层实现的相关方法，将管管方法添加到JS队列等待Java层主动拉取或者调用
+```
+
+C++层
+
+```
+```
+
+Java层
+
+```
+```
+

@@ -186,41 +186,12 @@ JavaScriptModule：JS暴露给Java调用的API集合，例如：AppRegistry、De
 
 JS的解析是在Webkit-JavaScriptCore中完成的，JSCExexutor.cpp对JavaScriptCore的功能做了进一步的封装，我们来看一下它的实现。
 
-在C++层的Executor.h中定义了两个抽象类
-
-ExecutorDelegate：该抽象类用于JS代码调用Native代码。
-
-```c++
-
-// This interface describes the delegate interface required by
-// Executor implementations to call from JS into native code.
-class ExecutorDelegate {
- public:
-  virtual ~ExecutorDelegate() {}
-
-  virtual void registerExecutor(std::unique_ptr<JSExecutor> executor,
-                                std::shared_ptr<MessageQueueThread> queue) = 0;
-  virtual std::unique_ptr<JSExecutor> unregisterExecutor(JSExecutor& executor) = 0;
-
-  virtual std::shared_ptr<ModuleRegistry> getModuleRegistry() = 0;
-
-  virtual void callNativeModules(
-    JSExecutor& executor, folly::dynamic&& calls, bool isEndOfBatch) = 0;
-  virtual MethodCallResult callSerializableNativeHook(
-    JSExecutor& executor, unsigned int moduleId, unsigned int methodId, folly::dynamic&& args) = 0;
-};
-```
-
-
-
-JSExecutor：正如它的名字那样，它是用来执行JS代码的。执行代码的命令是通过JS层的BatchedBridge传递过来的。
+JSExecutor：在Executor.h中定义，正如它的名字那样，它是用来执行JS代码的。执行代码的命令是通过JS层的BatchedBridge传递过来的。
 
 
 我们先来看一下JSExecutor的类图，可以看到
 
-<img src=""/>
-
-可以看到
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/3/UMLClassDiagram-JSExecutor.png"/>
 
 ```c++
 class JSExecutor {
@@ -272,6 +243,11 @@ public:
 ```
 
 
+可以看到除了JSExecutor.cpp实现了抽象类JSExecutor里的方法，ProxyExecutor.cpp也实现了它里面的方法，这是RN给了我们自定义JS解析器的能力，可以在CatalystInstance.Builder里
+setJSExecutor()，具体可以参见JavaJSExecutor与ProxyJavaScriptExecutor，它们的类图如下所示：
+
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/3/UMLClassDiagram-cxxbridge-ProxyJavaScriptExecutor.png"/>
+
 
 ## RN应用的启动流程
 
@@ -298,7 +274,9 @@ ReactRootView加载进来，并调用RN应用的JS入口APPRegistry来启动应�
 6 JS层找到已经注册的对应的启动组件，执行renderApplication()来渲染整个应用。
 ```
 
-### 实现细节-Java层
+************************************************************************************************************************************
+    ***                                                  接下来实现进入Java层                                                   ***
+************************************************************************************************************************************
 
 好，我们先从ReactActivity入手。
 
@@ -530,7 +508,6 @@ public class ReactInstanceManager {
 
 }
 ```
-
 
 整个代码的调用链，最终开启异步任务ReactContextInitAsyncTask来创建上下文ReactApplicationContext。
 
@@ -786,215 +763,10 @@ MessageQueueThread moduleQueue：Native线程，通过mReactQueueConfiguration.g
 Collection<JavaModuleWrapper> javaModules：java modules，来源于mJavaRegistry.getJavaModules(this)。
 Collection<ModuleHolder> cxxModules)：c++ modules，来源于mJavaRegistry.getCxxModules()。
 ```
-
-从上面的构造方法可以看出，从CatalystInstanceImpl将持有的JavaScriptModule注册表、NativeModule注册表、ReactCallback回调、JavaScriptExecutor、js消息队列
-native消息队列都通过JNI传递到C++层。
-
-### 实现细节-C++层
-
-**CatalystInstanceImpl.cpp**
-
-```C++
-void CatalystInstanceImpl::initializeBridge(
-    jni::alias_ref<ReactCallback::javaobject> callback,
-    // This executor is actually a factory holder.
-    JavaScriptExecutorHolder* jseh,
-    jni::alias_ref<JavaMessageQueueThread::javaobject> jsQueue,
-    jni::alias_ref<JavaMessageQueueThread::javaobject> moduleQueue,
-    jni::alias_ref<jni::JCollection<JavaModuleWrapper::javaobject>::javaobject> javaModules,
-    jni::alias_ref<jni::JCollection<ModuleHolder::javaobject>::javaobject> cxxModules) {
-  // TODO mhorowitz: how to assert here?
-  // Assertions.assertCondition(mBridge == null, "initializeBridge should be called once");
-
-  // This used to be:
-  //
-  // Java CatalystInstanceImpl -> C++ CatalystInstanceImpl -> Bridge -> Bridge::Callback
-  // --weak--> ReactCallback -> Java CatalystInstanceImpl
-  //
-  // Now the weak ref is a global ref.  So breaking the loop depends on
-  // CatalystInstanceImpl#destroy() calling mHybridData.resetNative(), which
-  // should cause all the C++ pointers to be cleaned up (except C++
-  // CatalystInstanceImpl might be kept alive for a short time by running
-  // callbacks). This also means that all native calls need to be pre-checked
-  // to avoid NPE.
-
-  // See the comment in callJSFunction.  Once js calls switch to strings, we
-  // don't need jsModuleDescriptions any more, all the way up and down the
-  // stack.
-
-  instance_->initializeBridge(folly::make_unique<JInstanceCallback>(callback),
-                              jseh->getExecutorFactory(),
-                              folly::make_unique<JMessageQueueThread>(jsQueue),
-                              folly::make_unique<JMessageQueueThread>(moduleQueue),
-                              buildModuleRegistry(std::weak_ptr<Instance>(instance_),
-                                                  javaModules, cxxModules));
-}
-```
-
-我们来看看这个C++函数的参数和Java层的对应关系。
-
-```
-callback:JInstanceCallback的实现类。
-
-```
-
-当ReactContext被创建以后，变回继续执行ReactContextInitAsyncTask.onPostExecute()方法。
-
-#### 6 ReactInstanceManager.ReactContextInitAsyncTask.onPostExecute(Result<ReactApplicationContext> result)
-
-```java
-public class ReactInstanceManager {
-
- /*
-   * Task class responsible for (re)creating react context in the background. These tasks can only
-   * be executing one at time, see {@link #recreateReactContextInBackground()}.
-   */
-  private final class ReactContextInitAsyncTask extends
-      AsyncTask<ReactContextInitParams, Void, Result<ReactApplicationContext>> {
-
-    @Override
-    protected void onPostExecute(Result<ReactApplicationContext> result) {
-      try {
-        //设置ReacContext
-        setupReactContext(result.get());
-      } catch (Exception e) {
-        mDevSupportManager.handleException(e);
-      } finally {
-        mReactContextInitAsyncTask = null;
-      }
-
-      // Handle enqueued request to re-initialize react context.
-      if (mPendingReactContextInitParams != null) {
-        recreateReactContextInBackground(
-            mPendingReactContextInitParams.getJsExecutorFactory(),
-            mPendingReactContextInitParams.getJsBundleLoader());
-        mPendingReactContextInitParams = null;
-      }
-    }
-}
-```
-
-doInBackground()做完事情之后，onPostExecute()会去调用ReactInstanceManager.setupReactContext()，它的实现如下所示：
-
-#### 7 ReactInstanceManager.setupReactContext(ReactApplicationContext reactContext)
-
-```java
-public class ReactInstanceManager {
-
-  private void setupReactContext(ReactApplicationContext reactContext) {
-    ReactMarker.logMarker(SETUP_REACT_CONTEXT_START);
-    Systrace.beginSection(TRACE_TAG_REACT_JAVA_BRIDGE, "setupReactContext");
-    UiThreadUtil.assertOnUiThread();
-    Assertions.assertCondition(mCurrentReactContext == null);
-    mCurrentReactContext = Assertions.assertNotNull(reactContext);
-    CatalystInstance catalystInstance =
-        Assertions.assertNotNull(reactContext.getCatalystInstance());
-
-    //执行Native Java module的初始化
-    catalystInstance.initialize();
-    //重置DevSupportManager的ReactContext
-    mDevSupportManager.onNewReactContextCreated(reactContext);
-    //内存状态回调设置
-    mMemoryPressureRouter.addMemoryPressureListener(catalystInstance);
-    //复位生命周期
-    moveReactContextToCurrentLifecycleState();
-
-    //mAttachedRootViews保存的是ReactRootView
-    for (ReactRootView rootView : mAttachedRootViews) {
-      attachMeasuredRootViewToInstance(rootView, catalystInstance);
-    }
-
-    ReactInstanceEventListener[] listeners =
-      new ReactInstanceEventListener[mReactInstanceEventListeners.size()];
-    listeners = mReactInstanceEventListeners.toArray(listeners);
-
-    for (ReactInstanceEventListener listener : listeners) {
-      listener.onReactContextInitialized(reactContext);
-    }
-    Systrace.endSection(TRACE_TAG_REACT_JAVA_BRIDGE);
-    ReactMarker.logMarker(SETUP_REACT_CONTEXT_END);
-  }
-
-
-  private void attachMeasuredRootViewToInstance(
-      ReactRootView rootView,
-      CatalystInstance catalystInstance) {
-    Systrace.beginSection(TRACE_TAG_REACT_JAVA_BRIDGE, "attachMeasuredRootViewToInstance");
-    UiThreadUtil.assertOnUiThread();
-
-    //移除并重置所有页面UI元素
-    // Reset view content as it's going to be populated by the application content from JS
-    rootView.removeAllViews();
-    rootView.setId(View.NO_ID);
-
-    //将ReactRootView作为根布局
-    UIManagerModule uiManagerModule = catalystInstance.getNativeModule(UIManagerModule.class);
-    int rootTag = uiManagerModule.addMeasuredRootView(rootView);
-    //设置相关
-    rootView.setRootViewTag(rootTag);
-
-    //包装启动参数launchOptions与模块名jsAppModuleName
-    @Nullable Bundle launchOptions与模块名 = rootView.getLaunchOptions();
-    WritableMap initialProps = Arguments.makeNativeMap(launchOptions);
-    String jsAppModuleName = rootView.getJSModuleName();
-
-    WritableNativeMap appParams = new WritableNativeMap();
-    appParams.putDouble("rootTag", rootTag);
-    appParams.putMap("initialProps", initialProps);
-
-    //启动流程入口：由Java层调用启动
-    catalystInstance.getJSModule(AppRegistry.class).runApplication(jsAppModuleName, appParams);
-    rootView.onAttachedToReactInstance();
-    Systrace.endSection(TRACE_TAG_REACT_JAVA_BRIDGE);
-  }
-}
-
-```
-
-ReactInstanceManager.attachMeasuredRootViewToInstance()最终进入了RN应用的启动流程入口，调用catalystInstance.getJSModule(AppRegistry.class).runApplication(jsAppModuleName, appParams)，
-AppRegistry.class是JS层暴露给Java层的接口方法。它的真正实现在AppRegistry.js里，AppRegistry.js是运行所有RN应用的JS层入口，我们来看看它的实现：
-
-**AppRegistry.js**
-
-```javascript
-
-  //上面代码最终调用的就是这个函数
-  runApplication(appKey: string, appParameters: any): void {
-    const msg =
-      'Running application "' + appKey + '" with appParams: ' +
-      JSON.stringify(appParameters) + '. ' +
-      '__DEV__ === ' + String(__DEV__) +
-      ', development-level warning are ' + (__DEV__ ? 'ON' : 'OFF') +
-      ', performance optimizations are ' + (__DEV__ ? 'OFF' : 'ON');
-    infoLog(msg);
-    BugReporting.addSource('AppRegistry.runApplication' + runCount++, () => msg);
-    invariant(
-      runnables[appKey] && runnables[appKey].run,
-      'Application ' + appKey + ' has not been registered.\n\n' +
-      'Hint: This error often happens when you\'re running the packager ' +
-      '(local dev server) from a wrong folder. For example you have ' +
-      'multiple apps and the packager is still running for the app you ' +
-      'were working on before.\nIf this is the case, simply kill the old ' +
-      'packager instance (e.g. close the packager terminal window) ' +
-      'and start the packager in the correct app folder (e.g. cd into app ' +
-      'folder and run \'npm start\').\n\n' +
-      'This error can also happen due to a require() error during ' +
-      'initialization or failure to call AppRegistry.registerComponent.\n\n'
-    );
-    runnables[appKey].run(appParameters);
-  },
-
-```
-
-
-### C++层实现细节
-
-C++层实现细节我们具体分析：JS文件的加载与解析流程。
-
 CatalystInstanceImpl被创建以后，便进行JS的加载。从上面第5步：ReactInstanceManager.createReactContext()方法可以知道，该函数会调
 用CatalystInstanceImpl.runJSBundle()来加载JS Bundle。我们开看一下它的实现。
 
-#### 1 CatalystInstanceImpl.runJSBundle()
+#### 7 CatalystInstanceImpl.runJSBundle()
 
 ···java
 public class CatalystInstanceImpl{
@@ -1026,13 +798,10 @@ public class CatalystInstanceImpl{
 }
 ···
 
-#### 2 JSBundleLoader.createAssetLoader()
-
-由于不同的情况可能会有不同的JSBundleLoader，我们假设用的是第一种：
+CatalystInstanceImpl.runJSBundle()会调用JSBundleLoader去加载JS Bundle，由于不同的情况可能会有不同的JSBundleLoader，我们假设用的是第一种：
 
 ```java
 
- */
 public abstract class JSBundleLoader {
 
   /**
@@ -1058,7 +827,7 @@ public abstract class JSBundleLoader {
 
 可以看出，它会继续调用CatalystInstanceImpl.loadScriptFromAssets()方法去加载JS Bundle，该方法的实现如下所示：
 
-#### 3 CatalystInstanceImpl.loadScriptFromAssets(AssetManager assetManager, String assetURL) 
+#### 8 CatalystInstanceImpl.loadScriptFromAssets(AssetManager assetManager, String assetURL) 
 
 ```java
 public class CatalystInstanceImpl {
@@ -1073,10 +842,15 @@ public class CatalystInstanceImpl {
 }
 ```
 
+CatalystInstanceImpl.java最终还是调用C++层的CatalystInstanceImpl.cpp去加载JS Bundle，我们去C++层看一下实现。
+
+************************************************************************************************************************************
+    ***                                                  接下来实现进入C++层                                                    ***
+************************************************************************************************************************************
+
 可以看出该方法最终调用Native方法jniLoadScriptFromAssets去加载JS Bundle，该方法的实现如下所示：
 
-
-#### 4 CatalystInstanceImpl.jniLoadScriptFromAssets(jni::alias_ref<JAssetManager::javaobject> assetManager, const std::string& assetURL)
+#### 9 CatalystInstanceImpl::jniLoadScriptFromAssets(jni::alias_ref<JAssetManager::javaobject> assetManager, const std::string& assetURL)
 
 CatalystInstanceImpl.cpp
 
@@ -1107,25 +881,9 @@ void CatalystInstanceImpl::jniLoadScriptFromAssets(
 }
 
 ```
-
-JSLoader.cpp
-
-···c++
-__attribute__((visibility("default")))
-AAssetManager *extractAssetManager(alias_ref<JAssetManager::javaobject> assetManager) {
-  auto env = Environment::current();
-  return AAssetManager_fromJava(env, assetManager.get());
-}
-
-std::unique_ptr<const JSBigString> loadScriptFromAssets(const std::string& assetName) {
-  auto env = Environment::current();
-  auto assetManager = JApplicationHolder::getApplication()->getAssets();
-  return loadScriptFromAssets(AAssetManager_fromJava(env, assetManager.get()), assetName);
-}
-
-···
-
 接着会调用Instance.cpp的loadScriptFromString()方法去解析JS Bundle里的内容。 
+
+#### 10 Instance::loadScriptFromString(std::unique_ptr<const JSBigString> string, std::string sourceURL)
 
 Instance.cpp
 
@@ -1142,6 +900,8 @@ void Instance::loadScriptFromString(std::unique_ptr<const JSBigString> string,
 ```
 
 loadScriptFromString()进一步调用NativeToJsBridge.cpp的loadApplication()方法，它的实现如下所示：
+
+#### 11 NativeToJsBridge::loadApplication(std::unique_ptr<JSModulesUnbundle> unbundle, std::unique_ptr<const JSBigString> startupScript, std::string startupScriptSourceURL) 
 
 NativeToJsBridge.cpp
 
@@ -1187,6 +947,8 @@ std::string startupScriptSourceURL：bundle的文件名。
 ```
 
 该函数进一步调用JSExecutor.cpp的loadApplicationScript()方法。
+
+#### 12 JSCExecutor::loadApplicationScript(std::unique_ptr<const JSBigString> script, std::string sourceURL) 
 
 JSExecutor.cpp
 
@@ -1371,6 +1133,168 @@ JSExecutor& executor：即前面我们分析过的JSCExecutor
 folly::dynamic&& calls：解析成功的JS的JSON通信参数结构
 bool isEndOfBatch：通知当前的JS Bundle是否处理完成。
 ```
+
+JS Bundle加载并解析完成后，ReactContextInitAsyncTask的后台任务完成，进入onPostExecute()方法，我们继续跟进它的实现。
+
+
+************************************************************************************************************************************
+    ***                                                  接下来实现进入Java层                                                   ***
+************************************************************************************************************************************
+
+当ReactContext被创建以后，变回继续执行ReactContextInitAsyncTask.onPostExecute()方法。
+
+#### 13 ReactInstanceManager.ReactContextInitAsyncTask.onPostExecute(Result<ReactApplicationContext> result)
+
+```java
+public class ReactInstanceManager {
+
+ /*
+   * Task class responsible for (re)creating react context in the background. These tasks can only
+   * be executing one at time, see {@link #recreateReactContextInBackground()}.
+   */
+  private final class ReactContextInitAsyncTask extends
+      AsyncTask<ReactContextInitParams, Void, Result<ReactApplicationContext>> {
+
+    @Override
+    protected void onPostExecute(Result<ReactApplicationContext> result) {
+      try {
+        //设置ReacContext
+        setupReactContext(result.get());
+      } catch (Exception e) {
+        mDevSupportManager.handleException(e);
+      } finally {
+        mReactContextInitAsyncTask = null;
+      }
+
+      // Handle enqueued request to re-initialize react context.
+      if (mPendingReactContextInitParams != null) {
+        recreateReactContextInBackground(
+            mPendingReactContextInitParams.getJsExecutorFactory(),
+            mPendingReactContextInitParams.getJsBundleLoader());
+        mPendingReactContextInitParams = null;
+      }
+    }
+}
+```
+
+doInBackground()做完事情之后，onPostExecute()会去调用ReactInstanceManager.setupReactContext()，它的实现如下所示：
+
+#### 14 ReactInstanceManager.setupReactContext(ReactApplicationContext reactContext)
+
+```java
+public class ReactInstanceManager {
+
+  private void setupReactContext(ReactApplicationContext reactContext) {
+    ReactMarker.logMarker(SETUP_REACT_CONTEXT_START);
+    Systrace.beginSection(TRACE_TAG_REACT_JAVA_BRIDGE, "setupReactContext");
+    UiThreadUtil.assertOnUiThread();
+    Assertions.assertCondition(mCurrentReactContext == null);
+    mCurrentReactContext = Assertions.assertNotNull(reactContext);
+    CatalystInstance catalystInstance =
+        Assertions.assertNotNull(reactContext.getCatalystInstance());
+
+    //执行Native Java module的初始化
+    catalystInstance.initialize();
+    //重置DevSupportManager的ReactContext
+    mDevSupportManager.onNewReactContextCreated(reactContext);
+    //内存状态回调设置
+    mMemoryPressureRouter.addMemoryPressureListener(catalystInstance);
+    //复位生命周期
+    moveReactContextToCurrentLifecycleState();
+
+    //mAttachedRootViews保存的是ReactRootView
+    for (ReactRootView rootView : mAttachedRootViews) {
+      attachMeasuredRootViewToInstance(rootView, catalystInstance);
+    }
+
+    ReactInstanceEventListener[] listeners =
+      new ReactInstanceEventListener[mReactInstanceEventListeners.size()];
+    listeners = mReactInstanceEventListeners.toArray(listeners);
+
+    for (ReactInstanceEventListener listener : listeners) {
+      listener.onReactContextInitialized(reactContext);
+    }
+    Systrace.endSection(TRACE_TAG_REACT_JAVA_BRIDGE);
+    ReactMarker.logMarker(SETUP_REACT_CONTEXT_END);
+  }
+
+
+  private void attachMeasuredRootViewToInstance(
+      ReactRootView rootView,
+      CatalystInstance catalystInstance) {
+    Systrace.beginSection(TRACE_TAG_REACT_JAVA_BRIDGE, "attachMeasuredRootViewToInstance");
+    UiThreadUtil.assertOnUiThread();
+
+    //移除并重置所有页面UI元素
+    // Reset view content as it's going to be populated by the application content from JS
+    rootView.removeAllViews();
+    rootView.setId(View.NO_ID);
+
+    //将ReactRootView作为根布局
+    UIManagerModule uiManagerModule = catalystInstance.getNativeModule(UIManagerModule.class);
+    int rootTag = uiManagerModule.addMeasuredRootView(rootView);
+    //设置相关
+    rootView.setRootViewTag(rootTag);
+
+    //包装启动参数launchOptions与模块名jsAppModuleName
+    @Nullable Bundle launchOptions与模块名 = rootView.getLaunchOptions();
+    WritableMap initialProps = Arguments.makeNativeMap(launchOptions);
+    String jsAppModuleName = rootView.getJSModuleName();
+
+    WritableNativeMap appParams = new WritableNativeMap();
+    appParams.putDouble("rootTag", rootTag);
+    appParams.putMap("initialProps", initialProps);
+
+    //启动流程入口：由Java层调用启动
+    catalystInstance.getJSModule(AppRegistry.class).runApplication(jsAppModuleName, appParams);
+    rootView.onAttachedToReactInstance();
+    Systrace.endSection(TRACE_TAG_REACT_JAVA_BRIDGE);
+  }
+}
+
+```
+
+************************************************************************************************************************************
+    ***                                                  接下来实现进入JS层                                                    ***
+************************************************************************************************************************************
+
+ReactInstanceManager.attachMeasuredRootViewToInstance()最终进入了RN应用的启动流程入口，调用catalystInstance.getJSModule(AppRegistry.class).runApplication(jsAppModuleName, appParams)，
+AppRegistry.class是JS层暴露给Java层的接口方法。它的真正实现在AppRegistry.js里，AppRegistry.js是运行所有RN应用的JS层入口，我们来看看它的实现：
+
+#### 15 AppRegistry.runApplication(appKey: string, appParameters: any)
+
+**AppRegistry.js**
+
+```javascript
+
+  //上面代码最终调用的就是这个函数
+  runApplication(appKey: string, appParameters: any): void {
+    const msg =
+      'Running application "' + appKey + '" with appParams: ' +
+      JSON.stringify(appParameters) + '. ' +
+      '__DEV__ === ' + String(__DEV__) +
+      ', development-level warning are ' + (__DEV__ ? 'ON' : 'OFF') +
+      ', performance optimizations are ' + (__DEV__ ? 'OFF' : 'ON');
+    infoLog(msg);
+    BugReporting.addSource('AppRegistry.runApplication' + runCount++, () => msg);
+    invariant(
+      runnables[appKey] && runnables[appKey].run,
+      'Application ' + appKey + ' has not been registered.\n\n' +
+      'Hint: This error often happens when you\'re running the packager ' +
+      '(local dev server) from a wrong folder. For example you have ' +
+      'multiple apps and the packager is still running for the app you ' +
+      'were working on before.\nIf this is the case, simply kill the old ' +
+      'packager instance (e.g. close the packager terminal window) ' +
+      'and start the packager in the correct app folder (e.g. cd into app ' +
+      'folder and run \'npm start\').\n\n' +
+      'This error can also happen due to a require() error during ' +
+      'initialization or failure to call AppRegistry.registerComponent.\n\n'
+    );
+    runnables[appKey].run(appParameters);
+  },
+
+```
+
 
 
 
