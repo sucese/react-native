@@ -84,31 +84,104 @@ NativeModuleRegistry：Java Module注册表，内部持有Map：Map<Class<? exte
 
 ## 一 通信桥的实现
 
-ExecutorDelegate：在Executor.h中定义，由JsToNativeBridge实现，该抽象类用于JS代码调用Native代码，该类的类图如下所示：
+关于通信桥在Java层中的实现
 
-<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/6/UMLClassDiagram-ExecutorDelegate.png"/>
+从文章[ReactNative源码篇：启动流程](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/2ReactNative源码篇：启动流程.md)我们得知在
 
+在CatalystInstanceImpl构造方法中做了初始化通信桥的操作：
+```java
+public class CatalystInstanceImpl implements CatalystInstance {
 
-```c++
+private CatalystInstanceImpl(
+      final ReactQueueConfigurationSpec ReactQueueConfigurationSpec,
+      final JavaScriptExecutor jsExecutor,
+      final NativeModuleRegistry registry,
+      final JavaScriptModuleRegistry jsModuleRegistry,
+      final JSBundleLoader jsBundleLoader,
+      NativeModuleCallExceptionHandler nativeModuleCallExceptionHandler) {
 
-// This interface describes the delegate interface required by
-// Executor implementations to call from JS into native code.
-class ExecutorDelegate {
- public:
-  virtual ~ExecutorDelegate() {}
+    ...
 
-  virtual void registerExecutor(std::unique_ptr<JSExecutor> executor,
-                                std::shared_ptr<MessageQueueThread> queue) = 0;
-  virtual std::unique_ptr<JSExecutor> unregisterExecutor(JSExecutor& executor) = 0;
-
-  virtual std::shared_ptr<ModuleRegistry> getModuleRegistry() = 0;
-
-  virtual void callNativeModules(
-    JSExecutor& executor, folly::dynamic&& calls, bool isEndOfBatch) = 0;
-  virtual MethodCallResult callSerializableNativeHook(
-    JSExecutor& executor, unsigned int moduleId, unsigned int methodId, folly::dynamic&& args) = 0;
-};
+    //Native方法，调用initializeBridge()方法，并创建BridgeCallback实例，初始化Bridge。
+    initializeBridge(
+      new BridgeCallback(this),
+      jsExecutor,
+      mReactQueueConfiguration.getJSQueueThread(),
+      mReactQueueConfiguration.getNativeModulesQueueThread(),
+      mJavaRegistry.getJavaModules(this),
+      mJavaRegistry.getCxxModules());
+    FLog.w(ReactConstants.TAG, "Initializing React Xplat Bridge after initializeBridge");
+    mMainExecutorToken = getMainExecutorToken();
+  }
+  
+  //在C++层初始化通信桥ReactBridge
+  private native void initializeBridge(
+      ReactCallback callback,
+      JavaScriptExecutor jsExecutor,
+      MessageQueueThread jsQueue,
+      MessageQueueThread moduleQueue,
+      Collection<JavaModuleWrapper> javaModules,
+      Collection<ModuleHolder> cxxModules);
+}
 ```
+传入的几个参数：
+
+```
+ReactCallback callback：CatalystInstanceImpl的静态内部类ReactCallback，负责接口回调。
+JavaScriptExecutor jsExecutor：JS执行器，将JS的调用传递给C++层。
+MessageQueueThread jsQueue.getJSQueueThread()：JS线程，通过mReactQueueConfiguration.getJSQueueThread()获得，mReactQueueConfiguration通过ReactQueueConfigurationSpec.createDefault()创建。
+MessageQueueThread moduleQueue：Native线程，通过mReactQueueConfiguration.getNativeModulesQueueThread()获得，mReactQueueConfiguration通过ReactQueueConfigurationSpec.createDefault()创建。
+Collection<JavaModuleWrapper> javaModules：java modules，来源于mJavaRegistry.getJavaModules(this)。
+Collection<ModuleHolder> cxxModules)：c++ modules，来源于mJavaRegistry.getCxxModules()。
+```
+
+我们去跟踪它的函数调用链：
+
+```
+CatalystInstanceImpl.initializeBridge() -> CatalystInstanceImpl::initializeBridge() -> Instance::initializeBridge（）
+```
+
+最终可以发现，Instance::initializeBridge（）实现了ReactBridge（C++层对应JsToNativeBridge与NativeToJsBridge）的初始化。
+
+**Instance.cpp**
+
+```
+void Instance::initializeBridge(
+    std::unique_ptr<InstanceCallback> callback,
+    std::shared_ptr<JSExecutorFactory> jsef,
+    std::shared_ptr<MessageQueueThread> jsQueue,
+    std::unique_ptr<MessageQueueThread> nativeQueue,
+    std::shared_ptr<ModuleRegistry> moduleRegistry) {
+  callback_ = std::move(callback);
+
+  if (!nativeQueue) {
+    // TODO pass down a thread/queue from java, instead of creating our own.
+
+    auto queue = folly::make_unique<CxxMessageQueue>();
+    std::thread t(queue->getUnregisteredRunLoop());
+    t.detach();
+    nativeQueue = std::move(queue);
+  }
+
+  jsQueue->runOnQueueSync(
+    [this, &jsef, moduleRegistry, jsQueue,
+     nativeQueue=folly::makeMoveWrapper(std::move(nativeQueue))] () mutable {
+      //初始化NativeToJsBridge对象
+      nativeToJsBridge_ = folly::make_unique<NativeToJsBridge>(
+          jsef.get(), moduleRegistry, jsQueue, nativeQueue.move(), callback_);
+
+      std::lock_guard<std::mutex> lock(m_syncMutex);
+      m_syncReady = true;
+      m_syncCV.notify_all();
+    });
+
+  CHECK(nativeToJsBridge_);
+}
+```
+
+我们接着去C++层看看JsToNativeBridge与NativeToJsBridge的实现。
+
+关于通信桥在C++层的实现
 
 JsToNativeBridge：该类继承于抽象类ExecutorDelegate，用于JS代码调用Native代码，JsToNativeBridge.cpp实现了该抽象类里的方法。
 
@@ -302,11 +375,161 @@ private:
 };
 ```
 
+### 关于通信桥在JS层的实现
+
+JS层Libraries/BatchedBridge包下面有3个JS文件：BatchedBridge.js、MessageQueue.js、NativeModules.js，它们封装了通信桥在JS层的实现。
+
+### BatchedBridge.js
+
+```JavaScript
+'use strict';
+
+const MessageQueue = require('MessageQueue');
+const BatchedBridge = new MessageQueue();
+
+// Wire up the batched bridge on the global object so that we can call into it.
+// Ideally, this would be the inverse relationship. I.e. the native environment
+// provides this global directly with its script embedded. Then this module
+// would export it. A possible fix would be to trim the dependencies in
+// MessageQueue to its minimal features and embed that in the native runtime.
+
+Object.defineProperty(global, '__fbBatchedBridge', {
+  configurable: true,
+  value: BatchedBridge,
+});
+
+module.exports = BatchedBridge;
+```
+可以看到在BatchedBridge中创建了MessageQueue对象。
+
+### MessageQueue.js
+
+MessageQueue的实现有点长，我们来一步步看它的实现。先看MessageQueue的构造方法。
+
+```JavaScript
+class MessageQueue {
+
+  //
+  _callableModules: {[key: string]: Object};
+  //队列，分别存放要调用的模块数组、方法数组、参数数组与数组大小
+  _queue: [Array<number>, Array<number>, Array<any>, number];
+  //回调函数数组，与_quueue一一对应，每个_queue中调用的方法，如果有回调方法，那么就在这个数组对应的下标上。
+  _callbacks: [];
+  //回调ID，自动增加。
+  _callbackID: number;
+  //调用函数ID，自动增加。
+  _callID: number;
+  _lastFlush: number;
+  //消息队列事件循环开始时间
+  _eventLoopStartTime: number;
+
+  _debugInfo: Object;
+  //Module Table，用于Native Module
+  _remoteModuleTable: Object;
+  //Method Table，用于Native Module
+  _remoteMethodTable: Object;
+
+  __spy: ?(data: SpyData) => void;
+
+  constructor() {
+    this._callableModules = {};
+    this._queue = [[], [], [], 0];
+    this._callbacks = [];
+    this._callbackID = 0;
+    this._callID = 0;
+    this._lastFlush = 0;
+    this._eventLoopStartTime = new Date().getTime();
+
+    if (__DEV__) {
+      this._debugInfo = {};
+      this._remoteModuleTable = {};
+      this._remoteMethodTable = {};
+    }
+
+    //绑定函数，也就是创建一个函数，使这个函数不论怎么调用都有同样的this值。
+    (this:any).callFunctionReturnFlushedQueue = this.callFunctionReturnFlushedQueue.bind(this);
+    (this:any).callFunctionReturnResultAndFlushedQueue = this.callFunctionReturnResultAndFlushedQueue.bind(this);
+    (this:any).flushedQueue = this.flushedQueue.bind(this);
+    (this:any).invokeCallbackAndReturnFlushedQueue = this.invokeCallbackAndReturnFlushedQueue.bind(this);
+  }
+}
+```
+
+```JavaScript
+
+```
+
+
+### NativeModules.jS
+
+> NativeModules描述了Module的结构，用于解析并生成Module。
+
+Module的结构定义如下所示：
+
+```JavaScript
+type ModuleConfig = [
+  string, /* name */
+  ?Object, /* constants */
+  Array<string>, /* functions */
+  Array<number>, /* promise method IDs */
+  Array<number>, /* sync method IDs */
+];
+```
+举例
+
+```JavaScript
+{
+  "remoteModuleConfig": {
+    "Logger": {
+      "constants": { /* If we had exported constants... */ },
+      "moduleID": 1,
+      "methods": {
+        "requestPermissions": {
+          "type": "remote",
+          "methodID": 1
+        }
+      }
+    }
+  }
+}
+{
+  'ToastAndroid': {
+    moduleId: 0,
+    methods: {
+      'show': {
+        methodID: 0
+      }
+    },
+    constants: {
+      'SHORT': '0',
+      'LONG': '1'
+    }
+  },
+  'moduleB': {
+    moduleId: 0,
+    methods: {
+      'method1': {
+        methodID: 0
+      }
+    },
+    'key1': 'value1',
+    'key2': 'value2'
+  }
+}
+
+```
+
+```JavaScript
+
+```
+
+
+
 ## 二 Java层调用JS层
 
 **举例**
 
-在上一篇文章[ReactNative源码篇：启动流程](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/2ReactNative源码篇：启动流程.md)中，我们在ReactInstanceManager.onAttachedToReactInstance()方法中调用APPRegistry.jS的runApplication()来
+在文章[ReactNative源码篇：启动流程](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/2ReactNative源码篇：启动流程.md)中，我们在ReactInstanceManager.onAttachedToReactInstance()方法中调用APPRegistry.jS的runApplication()来
 启动RN应用，这就是一个典型的Java层调用JS层的例子，我们来具体分析一下这个例子的实现方式。
 
 1 首先定义了接口AppRegistry，该接口继承于JavaScriptModule，如下所示：
@@ -967,7 +1190,8 @@ folly::Optional<Object> JSCNativeModules::createModule(const std::string& name, 
   if (!m_genNativeModuleJS) {
 
     auto global = Object::getGlobalObject(context);
-    //JSC通过NativeModules.js中global.__fbGenNativeModule = genModule属性
+    //NativeModules.js中将全局变量__fbGenNativeModule指向了函数NativeModules::gen()方法，此处
+    //便是去获取JSC去调用这个方法
     m_genNativeModuleJS = global.getProperty("__fbGenNativeModule").asObject();
     m_genNativeModuleJS->makeProtected();
 
@@ -981,6 +1205,7 @@ folly::Optional<Object> JSCNativeModules::createModule(const std::string& name, 
     return nullptr;
   }
 
+  //调用NativeModules::gen()方法
   Value moduleInfo = m_genNativeModuleJS->callAsFunction({
     Value::fromDynamic(context, result->config),
     Value::makeNumber(context, result->index)
@@ -995,11 +1220,13 @@ folly::Optional<Object> JSCNativeModules::createModule(const std::string& name, 
 上面的方法实现的功能分为2步：
 
 ```
-1 通过C++获取Java层注册表。
-2 通过JSC调用JS层方法。
+1 调用ModuleRegistry::getConfig()获取ModuleConfig。
+2 通过JSC调用NativeModules.js的genModule()方法
 ```
 
-**ModuleRegistry.js**
+我们先来看ModuleConfig的获取：
+
+**ModuleRegistry.cpp**
 
 ```c++
  
@@ -1066,7 +1293,7 @@ folly::Optional<ModuleConfig> ModuleRegistry::getConfig(const std::string& name)
 
 ```
 
-获取到对应Module，就该生成Module，
+获取到相应ModuleConfig就会去调用NativeModules.js的genModule()生成JS将要调用对应的JS Module。
 
 **NativeModules.js**
 
@@ -1341,7 +1568,7 @@ class JavaNativeModule : public NativeModule {
 
   void JavaNativeModule::invoke(ExecutorToken token, unsigned int reactMethodId, folly::dynamic&& params) {
 
-  //wrapper_-的类型是JavaModuleWrapper，映射Java层的JavaModuleWrapper.java，在ModuleRegistryHolder.cpp构造方法中由Java传入的Java Module被C++包装成
+  //wrapper_-的类型是JavaModuleWrapper.cpp，映射Java层的JavaModuleWrapper.java，在ModuleRegistryHolder.cpp构造方法中由Java传入的Java Module被C++包装成
   //JavaModuleWrapper对象。通过反射调用Java层的JavaModuleWrapper.java的invoke()方法，同时把mothodId和参数传过去。
   static auto invokeMethod =
     wrapper_->getClass()->getMethod<void(JExecutorToken::javaobject, jint, ReadableNativeArray::javaobject)>("invoke");
@@ -1351,7 +1578,7 @@ class JavaNativeModule : public NativeModule {
 }
 ```
 
-该方法通过反射调用Java层的JavaModuleWrapper.java的invoke()方法，同时把mothodId和参数传过去。我们来看看JavaModuleWrapper.java的invoke()方法的实现。
+该方法调用通过反射调用Java层的JavaModuleWrapper.java的invoke()方法，同时把mothodId和参数传过去。我们来看看JavaModuleWrapper.java的invoke()方法的实现。
 
 ```java
 
@@ -1374,116 +1601,6 @@ public class JavaModuleWrapper {
 
 JavaModuleWrapper对应C++层的NativeModule，该类针对Java BaseJavaModule进行了包装，是的C++层可以更加方便的通过JNI调用Java Module。
 
-
-### 
-
-Libraries/BatcherBridge/MessageQueue.js
-
-```javascript
-
-class MessageQueue {
-
- enqueueNativeCall(moduleID: number, methodID: number, params: Array<any>, onFail: ?Function, onSucc: ?Function) {
-    if (onFail || onSucc) {
-      if (__DEV__) {
-        const callId = this._callbackID >> 1;
-        this._debugInfo[callId] = [moduleID, methodID];
-        if (callId > DEBUG_INFO_LIMIT) {
-          delete this._debugInfo[callId - DEBUG_INFO_LIMIT];
-        }
-      }
-      onFail && params.push(this._callbackID);
-      /* $FlowFixMe(>=0.38.0 site=react_native_fb,react_native_oss) - Flow error
-       * detected during the deployment of v0.38.0. To see the error, remove
-       * this comment and run flow */
-      this._callbacks[this._callbackID++] = onFail;
-      onSucc && params.push(this._callbackID);
-      /* $FlowFixMe(>=0.38.0 site=react_native_fb,react_native_oss) - Flow error
-       * detected during the deployment of v0.38.0. To see the error, remove
-       * this comment and run flow */
-      this._callbacks[this._callbackID++] = onSucc;
-    }
-
-    if (__DEV__) {
-      global.nativeTraceBeginAsyncFlow &&
-        global.nativeTraceBeginAsyncFlow(TRACE_TAG_REACT_APPS, 'native', this._callID);
-    }
-    this._callID++;
-
-    this._queue[MODULE_IDS].push(moduleID);
-    this._queue[METHOD_IDS].push(methodID);
-
-    if (__DEV__) {
-      // Any params sent over the bridge should be encodable as JSON
-      JSON.stringify(params);
-
-      // The params object should not be mutated after being queued
-      deepFreezeAndThrowOnMutationInDev((params:any));
-    }
-    this._queue[PARAMS].push(params);
-
-    const now = new Date().getTime();
-    if (global.nativeFlushQueueImmediate &&
-        now - this._lastFlush >= MIN_TIME_BETWEEN_FLUSHES_MS) {
-      global.nativeFlushQueueImmediate(this._queue);
-      this._queue = [[], [], [], this._callID];
-      this._lastFlush = now;
-    }
-    Systrace.counterEvent('pending_js_to_native_queue', this._queue[0].length);
-    if (__DEV__ && this.__spy && isFinite(moduleID)) {
-      this.__spy(
-        { type: TO_NATIVE,
-          module: this._remoteModuleTable[moduleID],
-          method: this._remoteMethodTable[moduleID][methodID],
-          args: params }
-      );
-    } else if (this.__spy) {
-      this.__spy({type: TO_NATIVE, module: moduleID + '', method: methodID, args: params});
-    }
-  }
-
-}
-```
-###
-
-Java层的事件驱动也可以额看成Java层与JS层的通信，最终会调用MessageQueue.callFunctionReturnFlushedQueue()方法。
-
-Libraries/BatcherBridge/MessageQueue.js
-
-```javascript
-
-class MessageQueue {
-
-  callFunctionReturnFlushedQueue(module: string, method: string, args: Array<any>) {
-    guard(() => {
-      this.__callFunction(module, method, args);
-      this.__callImmediates();
-    });
-
-    return this.flushedQueue();
-  }
-
-}
-```
-
-然后调用MessageQueue.flushedQueue()将MessageQueue中的所有数据通过C层发往JS层。
-
-```javascript
-
-class MessageQueue {
-
-  flushedQueue() {
-    this.__callImmediates();
-
-    const queue = this._queue;
-    this._queue = [[], [], [], this._callID];
-    return queue[0].length ? queue : null;
-  }
-}
-```
-事件到达Java层后调用NativeModulesReactCallback.call()方法。
-
-``
 
 自此，JS代码完成了对Java代码的调用，我们再来总结一下整个流程。
 

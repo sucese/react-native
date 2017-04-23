@@ -182,7 +182,43 @@ JavaScriptModule：JS暴露给Java调用的API集合，例如：AppRegistry、De
 
 好，了解了这些重要概念，我们开始分析整个RN的启动流程。
 
-## JS解析器的实现
+## 执行器的实现
+
+在C++层的Executor.h文件中同一定义了执行Native代码的抽象类ExecutorDelegate，以及执行JS代码的抽象类JSExecutor。
+
+### Native代码执行器
+
+ExecutorDelegate：在Executor.h中定义，由JsToNativeBridge实现，该抽象类用于JS代码调用Native代码，该类的类图如下所示：
+
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/6/UMLClassDiagram-ExecutorDelegate.png"/>
+
+```c++
+
+// This interface describes the delegate interface required by
+// Executor implementations to call from JS into native code.
+class ExecutorDelegate {
+ public:
+  virtual ~ExecutorDelegate() {}
+
+  //注册JS执行器
+  virtual void registerExecutor(std::unique_ptr<JSExecutor> executor,
+                                std::shared_ptr<MessageQueueThread> queue) = 0;
+  //注销JS执行器
+  virtual std::unique_ptr<JSExecutor> unregisterExecutor(JSExecutor& executor) = 0;
+
+  //获取模块注册表
+  virtual std::shared_ptr<ModuleRegistry> getModuleRegistry() = 0;
+
+  //调用Native Module，在它实现中，它会进一步调用ModuleRegistry::callNativeMethod() -> NativeModule::invoke()，进而
+  //完成对Native Module的调用。
+  virtual void callNativeModules(
+    JSExecutor& executor, folly::dynamic&& calls, bool isEndOfBatch) = 0;
+  virtual MethodCallResult callSerializableNativeHook(
+    JSExecutor& executor, unsigned int moduleId, unsigned int methodId, folly::dynamic&& args) = 0;
+};
+```
+
+### JS代码执行器
 
 JS的解析是在Webkit-JavaScriptCore中完成的，JSCExexutor.cpp对JavaScriptCore的功能做了进一步的封装，我们来看一下它的实现。
 
@@ -479,6 +515,8 @@ public class ReactInstanceManager {
   }
 
   private void recreateReactContextInBackgroundFromBundleLoader() {
+    //mJSCConfig可以在ReactNativeHost创建ReactInstanceManager时进行配置。mJSCConfig会通过JSCJavaScriptExecutor的
+    //Native方法HybridData initHybrid(ReadableNativeArray jscConfig)传递到C++层。
     recreateReactContextInBackground(
         new JSCJavaScriptExecutor.Factory(mJSCConfig.getConfigMap()),
         mBundleLoader);
@@ -540,6 +578,7 @@ public class ReactInstanceManager {
 
       Assertions.assertCondition(params != null && params.length > 0 && params[0] != null);
       try {
+        //利用getJsExecutorFactory创建jsExecutor，并传递到C++层。
         JavaScriptExecutor jsExecutor = params[0].getJsExecutorFactory().create();
         //异步执行createReactContext()方法，创建ReactContext
         return Result.of(createReactContext(jsExecutor, params[0].getJsBundleLoader()));
@@ -741,7 +780,8 @@ private CatalystInstanceImpl(
     mMainExecutorToken = getMainExecutorToken();
   }
   
-    private native void initializeBridge(
+  //在C++层初始化通信桥ReactBridge
+  private native void initializeBridge(
       ReactCallback callback,
       JavaScriptExecutor jsExecutor,
       MessageQueueThread jsQueue,

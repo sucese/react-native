@@ -26,7 +26,9 @@ star文章, 关注文章的最新的动态。另外建议大家去Github上浏�
 - [4ReactNative源码篇：渲染原理](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/4ReactNative源码篇：渲染原理.md)
 - [5ReactNative源码篇：线程模型](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/5ReactNative源码篇：线程模型.md)
 - [6ReactNative源码篇：通信机制](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/6ReactNative源码篇：通信机制.md)
-								
+						
+## Java与C++的交互
+
 我们都知道如果需要用Java调用C/C++，需要用到Java中的JNI，但是用过JNI的同学都知道这是个繁琐且低效的调用方式，在大型工程体现的更加明显，因为我们需要将Java与C/C++的
 相互访问与通信框架化，形成更高层次的封装，避免直接使用原始的JNI反射API去做调用。
 
@@ -177,6 +179,174 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
 } 
 ```
 
+## JavaScript与C++的交互
 
-这部分内容牵扯到JNI的动态注册，我们先简单回忆一下动态注册的相关内容：
+RN解析JS用的是Webkit的脚本引擎JavaScriptCore，JavaScriptCore负责JS的解释与执行。
 
+> Webkit是一个开源的浏览器引擎，Safari、Chrome等浏览器都使用了该引擎，它包括一个网页排版渲染引擎WebCore与一个脚本引擎JavaScriptCore。
+
+JavaScriptCore API数据结构：
+
+```
+JSGlobalContextRef：JavaScript全局上下文。也就是JavaScript的执行环境。
+JSValueRef：JavaScript的一个值，可以是变量、object、函数。
+JSObjectRef：JavaScript的一个object或函数。
+SStringRef：JavaScript的一个字符串。
+JSClassRef：JavaScript的类。
+JSClassDefinition：JavaScript的类定义，使用这个结构，C、C++可以定义和注入JavaScript的类。
+```
+
+JavaScriptCore API主要函数：
+
+```
+JSGlobalContextCreateJSGlobalContextRelease：创建和销毁JavaScript全局上下文。
+JSContextGetGlobalObject：获取JavaScript的Global对象。
+JSObjectSetPropertyJSObjectGetProperty：JavaScript对象的属性操作。
+JSEvaluateScript：执行一段JS脚本。
+JSClassCreate：创建一个JavaScript类。
+JSObjectMake：创建一个JavaScript对象。
+JSObjectCallAsFunction：调用一个JavaScript函数。
+JSStringCreateWithUTF8CstringJSStringRelease：创建、销毁一个JavaScript字符串
+JSValueToBooleanJSValueToNumber JSValueToStringCopy：JSValueRef转为C++类型
+JSValueMakeBooleanJSValueMakeNumber JSValueMakeString：C++类型转为JSValueRef
+```
+
+### C++调用JavaScript
+
+1 获取Global全局对象
+
+```c++
+JSGlobalContextRef context = JSGlobalContextCreate(NULL);
+JSObjectRef global = JSContextGetGlobalObject(ctx); 
+```
+2 获取JavaScript的全局变量、全局函数或者全局复杂对象，并完成调用。
+
+```c++
+//获取全局变量
+JSStringRef varName = JSStringCreateWithUTF8CString("JavaScript变量名");
+JSValueRef var = JSObjectGetProperty(ctx, globalObj, varName,NULL); JSStringRelease(varName);
+//转化为C++类型
+int n = JSValueToNumber(ctx, var, NULL);
+
+//获取全局函数
+JSStringRef funcName = JSStringCreateWithUTF8CString("JavaScript函数名");
+JSValueRef func = JSObjectGetProperty(ctx, globalObj, funcName,NULL); JSStringRelease(funcName);
+//装换为函数对象
+JSObjectRef funcObject = JSValueToObject(ctx,func, NULL);
+//组织参数,将两个数值1和2作为两个参数
+JSValueRef args[2];
+args[0] = JSValueMakeNumber(ctx, 1);
+args[1] = JSValueMakeNumber(ctx, 2);
+//调用函数
+JSValueRef returnValue = JSObjectCallAsFunction(ctx, funcObject,NULL, 2, args, NULL);
+//处理返回值
+int ret = JSValueToNumber(ctx, returnValue, NULL);
+
+//获取复杂的对象
+JSStringRef objName=JSStringCreateWithUTF8CString("JavaScript复杂对象名");
+JSValueRef obj = JSObjectGetProperty(ctx, globalObj, objName,NULL); JSStringRelease(objName);
+//装换为对象
+JSObjectRef object = JSValueToObject(ctx,obj, NULL);
+//获取对象的方法
+JSStringRef funcObjName =JSStringCreateWithUTF8CString("JavaScript复杂对象的方法");
+JSValueRef objFunc = JSObjectGetProperty(ctx, object, funcObjName,NULL); JSStringRelease(funcObjName);
+//调用复杂对象的方法,这里省略了参数和返回值
+JSObjectCallAsFunction(ctx, objFunc, NULL, 0, 0, NULL);
+
+```
+### JavaScript调用C++
+
+JavaScript想要调用C++，就必须先要将C++里的变量、函数与类注入到JavaScript中。
+
+1 定义一个C++类，在类中定义一组全局函数，并封装JavaScriptCore对C++类的调用，提供给JavaScriptCore进行CallBack回调。
+
+```c++
+class test{         
+
+public:
+    test(){
+        number=0;
+    };
+
+    void func(){
+        number++;
+    }
+    int number;
+};
+
+test g_test;//变量定义
+
+//全局函数，封装test类的func方法调用
+JSValueRef testFunc(JSContextRef ctx, JSObjectRef ,JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[],JSValueRef*){
+
+    test* t =static_cast<test*>(JSObjectGetPrivate(thisObject));
+    t->func();
+    returnJSValueMakeUndefined(ctx);
+}
+
+//全局函数，封装test类的成员变量number的get操作
+
+JSValueRef getTestNumber(JSContextRef ctx, JSObjectRefthisObject, JSStringRef, JSValueRef*){
+
+    test* t =static_cast<test*>(JSObjectGetPrivate(thisObject));
+    returnJSValueMakeNumber(ctx, t->number);
+}
+
+//使用一个函数, 创建JavaScript类
+JSClassRef createTestClass(){
+
+    //类成员变量定义，可以有多个，最后一个必须是{ 0, 0, 0 }，也可以指定set操作
+    static JSStaticValuetestValues[] = {
+        {"number", getTestNumber, 0, kJSPropertyAttributeNone },
+        { 0, 0, 0, 0}
+    };
+
+    //类的方法定义，可以有多个，最后一个必须是{ 0, 0, 0 }
+    staticJSStaticFunction testFunctions[] = {
+        {"func", testFunc, kJSPropertyAttributeNone },
+        { 0, 0, 0 }
+    };
+
+    //定义一个类
+    staticJSClassDefinition classDefinition = {
+
+        0,kJSClassAttributeNone, "test", 0, testValues, testFunctions,
+        0, 0, 0, 0,0, 0, 0, 0, 0, 0, 0
+
+    };
+
+    //JSClassCreate执行后，就创建一个了JavaScript test类
+    staticJSClassRef t = JSClassCreate(&classDefinition);
+    return t;
+}
+```
+
+2 创建JavaScript类
+
+```
+createTestClass ();
+JSGlobalContextRef ctx = JSGlobalContextCreate(NULL);
+JSObjectRef globalObj = JSContextGetGlobalObject(ctx); 
+```
+   
+
+3 新建一个JavaScript类对象，并使之绑定g_test变量
+
+```
+JSObjectRef classObj= JSObjectMake(ctx,testClass(), &g_test);
+```
+
+4 将新建的对象注入JavaScript中
+
+```
+JSStringRef objName= JSStringCreateWithUTF8CString("g_test");
+JSObjectSetProperty(ctx,globalObj,objName,classObj,kJSPropertyAttributeNone,NULL);
+```
+ 
+将C++类和类指针注入到JavaScript后，在JavaScript中就可以这样使用了：
+
+```
+g_test.func();
+var n = g_test.number;
+var t = new test;
+````
