@@ -84,6 +84,42 @@ NativeModuleRegistry：Java Module注册表，内部持有Map：Map<Class<? exte
 
 ## 一 配置表的实现
 
+### 配置表的定义
+
+函数配置表定义在NativeModule.h中。
+
+```
+struct MethodDescriptor {
+  std::string name;
+  // type is one of js MessageQueue.MethodTypes
+  std::string type;
+
+  MethodDescriptor(std::string n, std::string t)
+      : name(std::move(n))
+      , type(std::move(t)) {}
+};
+```
+
+method的定义
+
+```java
+public class JavaModuleWrapper {
+  public class MethodDescriptor {
+    @DoNotStrip
+    Method method;
+    @DoNotStrip
+    String signature;
+    @DoNotStrip
+    String name;
+    @DoNotStrip
+    String type;
+  }
+}
+```
+
+
+### 配置表的创建
+
 在文章[ReactNative源码篇：启动流程](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/2ReactNative源码篇：启动流程.md)中，我们可以知道在ReactInstanceManager执行createReactContext()时
 创建了JavaScriptModuleRegistry与NativeModuleRegistry这两张表，我们跟踪一下它们俩的创建流程，以及创建完成后各自的去向。
 
@@ -1218,7 +1254,7 @@ folly::Optional<Object> JSCNativeModules::createModule(const std::string& name, 
 2 通过JSC调用NativeModules.js的genModule()方法
 ```
 
-我们先来看ModuleConfig的获取：
+ModuleRegistry是从Java层传递过来额JavaModuleRegistry，ModuleRegistry::getConfig()查询Java Module的配置表，然后发送给NativeModule.js生成对应的JS Module。
 
 **ModuleRegistry.cpp**
 
