@@ -85,6 +85,10 @@ ReactInstanceManager.setupReactContext()方法中，我们会调用attachMeasure
 
 ## 渲染原理
 
+RN应用渲染原理流程图如下所示：
+
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/4/react_native_render_principle_flow.png"/>
+
 **举例**
 
 在讲解原理之前，我们先来看一个简单的例子：
@@ -159,13 +163,6 @@ React.createElement(
 ReactElement.createElement = function (type, config, children){ ... }
 ```
 
-然后该方法按照以下调用链：
-
-
-
-```java
-
-public class ReactInstanceManager{
 
 private void attachMeasuredRootViewToInstance(
       ReactRootView rootView,

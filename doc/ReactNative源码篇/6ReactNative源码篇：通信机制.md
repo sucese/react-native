@@ -552,6 +552,10 @@ type ModuleConfig = [
 
 ## 四 Java层调用JS层
 
+RN应用通信机制流程图（Java->JS）如下所示：
+
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/6/react_native_communication_mechanism_java_to_js_flow.png"/>
+
 **举例**
 
 在文章[ReactNative源码篇：启动流程](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/2ReactNative源码篇：启动流程.md)中，我们在ReactInstanceManager.onAttachedToReactInstance()方法中调用APPRegistry.jS的runApplication()来
@@ -1013,6 +1017,10 @@ JavaScript层
 接下来，我们分析一下JS代码调用Java代码的流程。
 
 ## 三 JS层调用Java层
+
+RN应用通信机制流程图（JS->Java）如下所示：
+
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/6/react_native_communication_mechanism_js_to_java_flow.png"/>
 
 **举例**
 

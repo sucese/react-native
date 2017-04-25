@@ -291,6 +291,10 @@ setJSExecutor()，具体可以参见JavaJSExecutor与ProxyJavaScriptExecutor，�
 
 >一句话概括启动流程：先是应用终端启动并创建应用上下文，应用上下文启动JS Runtime，进行布局，再由应用终端进行渲染，最后将渲染的View添加到ReactRootView上，最终呈现在用户面前。
 
+RN应用的启动流程图如下所示：
+
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/3/react_native_start_flow_structure.png"/>
+
 详细流程：
 
 ```
