@@ -219,6 +219,10 @@ ModuleRegistry来进行调用。
 
 >JNI作为C++与Java的桥梁，JSC作为C++与JavaScript的桥梁，而C++最终连接了Java与JavaScript。
 
+RN应用通信桥结构图如下所示：
+
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/6/react_native_communication_bridge.png"/>
+
 ### 关于通信桥在Java层中的实现
 
 从文章[ReactNative源码篇：启动流程](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/2ReactNative源码篇：启动流程.md)我们得知在
@@ -479,11 +483,6 @@ class MessageQueue {
   }
 }
 ```
-
-```JavaScript
-
-```
-
 
 ### NativeModules.jS
 
