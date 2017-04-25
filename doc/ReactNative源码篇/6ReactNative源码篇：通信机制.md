@@ -82,7 +82,102 @@ NativeModuleRegistry：Java Module注册表，内部持有Map：Map<Class<? exte
 
 好，了解了这些重要概念，我们开始分析整个RN的通信机制。
 
-## 一 通信桥的实现
+## 一 配置表的实现
+
+在文章[ReactNative源码篇：启动流程](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/2ReactNative源码篇：启动流程.md)中，我们可以知道在ReactInstanceManager执行createReactContext()时
+创建了JavaScriptModuleRegistry与NativeModuleRegistry这两张表，我们跟踪一下它们俩的创建流程，以及创建完成后各自的去向。
+
+通过上面分析我们可知JavaScriptModuleRegistry创建完成后由CatalystInstanceImpl实例所持有，供后续Java调用JS时使用。相当于Java层此时持有了一张JS模块表，它以后可以通过这个表去调用JS。
+而NativeModuleRegistry在CatalystInstanceImpl.initializeBridge()方法中被传入C++层，最终可以被JS层所拿到。
+
+```java
+public class CatalystInstanceImpl(
+  private CatalystInstanceImpl(
+      final ReactQueueConfigurationSpec ReactQueueConfigurationSpec,
+      final JavaScriptExecutor jsExecutor,
+      final NativeModuleRegistry registry,
+      final JavaScriptModuleRegistry jsModuleRegistry,
+      final JSBundleLoader jsBundleLoader,
+      NativeModuleCallExceptionHandler nativeModuleCallExceptionHandler) {
+
+    ...
+
+    initializeBridge(
+      new BridgeCallback(this),
+      jsExecutor,
+      mReactQueueConfiguration.getJSQueueThread(),
+      mReactQueueConfiguration.getNativeModulesQueueThread(),
+      mJavaRegistry.getJavaModules(this),//传入的是Collection<JavaModuleWrapper> ，JavaModuleWrapper是NativeHolder的一个Wrapper类，它对应了C++层JavaModuleWrapper.cpp.
+      mJavaRegistry.getCxxModules());//传入的是Collection<ModuleHolder> ，ModuleHolder是NativeModule的一个Holder类，可以实现NativeModule的懒加载。
+    FLog.w(ReactConstants.TAG, "Initializing React Xplat Bridge after initializeBridge");
+    mMainExecutorToken = getMainExecutorToken();
+  }
+)
+```
+
+这里我们注意一下传入C++的两个集合
+
+```
+mJavaRegistry.getJavaModules(this)：传入的是Collection<JavaModuleWrapper> ，JavaModuleWrapper是NativeHolder的一个Wrapper类，它对应了C++层JavaModuleWrapper.cpp，
+JS在Java的时候最终会调用到这个类的inovke()方法上。
+
+mJavaRegistry.getCxxModules())：传入的是Collection<ModuleHolder> ，ModuleHolder是NativeModule的一个Holder类，可以实现NativeModule的懒加载。
+```
+我们继续跟踪这两个集合到了C++层之后的去向。
+
+**CatalystInstanceImpl.cpp**
+
+```c++
+void CatalystInstanceImpl::initializeBridge(
+    jni::alias_ref<ReactCallback::javaobject> callback,
+    // This executor is actually a factory holder.
+    JavaScriptExecutorHolder* jseh,
+    jni::alias_ref<JavaMessageQueueThread::javaobject> jsQueue,
+    jni::alias_ref<JavaMessageQueueThread::javaobject> moduleQueue,
+    jni::alias_ref<jni::JCollection<JavaModuleWrapper::javaobject>::javaobject> javaModules,
+    jni::alias_ref<jni::JCollection<ModuleHolder::javaobject>::javaobject> cxxModules) {
+
+
+  instance_->initializeBridge(folly::make_unique<JInstanceCallback>(callback),
+                              jseh->getExecutorFactory(),
+                              folly::make_unique<JMessageQueueThread>(jsQueue),
+                              folly::make_unique<JMessageQueueThread>(moduleQueue),
+                              buildModuleRegistry(std::weak_ptr<Instance>(instance_),
+                                                  javaModules, cxxModules));
+}
+```
+
+这两个集合在CatalystInstanceImpl::initializeBridge()被打包成ModuleRegistry传入Instance.cpp.、，如下所示：
+
+**ModuleRegistryBuilder.cpp**
+
+```c++
+std::unique_ptr<ModuleRegistry> buildModuleRegistry(
+    std::weak_ptr<Instance> winstance,
+    jni::alias_ref<jni::JCollection<JavaModuleWrapper::javaobject>::javaobject> javaModules,
+    jni::alias_ref<jni::JCollection<ModuleHolder::javaobject>::javaobject> cxxModules) {
+
+  std::vector<std::unique_ptr<NativeModule>> modules;
+  for (const auto& jm : *javaModules) {
+    modules.emplace_back(folly::make_unique<JavaNativeModule>(winstance, jm));
+  }
+  for (const auto& cm : *cxxModules) {
+    modules.emplace_back(
+      folly::make_unique<CxxNativeModule>(winstance, cm->getName(), cm->getProvider()));
+  }
+  if (modules.empty()) {
+    return nullptr;
+  } else {
+    return folly::make_unique<ModuleRegistry>(std::move(modules));
+  }
+}
+```
+
+打包好的ModuleRegistry通过Instance::initializeBridge()传入到NativeToJsBridge.cpp中，并在NativeToJsBridge的构造方法中传给JsToNativeBridge，以后JS如果调用Java就可以通过
+ModuleRegistry来进行调用。
+
+
+## 二 通信桥的实现
 
 关于整个RN的通信机制，可以用一句话来概括：
 
@@ -419,7 +514,7 @@ type ModuleConfig = [
 
 
 
-## 二 Java层调用JS层
+## 四 Java层调用JS层
 
 **举例**
 
@@ -881,7 +976,7 @@ JavaScript层
 
 接下来，我们分析一下JS代码调用Java代码的流程。
 
-## JS层调用Java层
+## 三 JS层调用Java层
 
 **举例**
 
@@ -995,9 +1090,9 @@ ToastAndroid.show('Awesome', ToastAndroid.SHORT);
 
 第一步，我们再调用Java代码时都通过NativeModules.xxxModule.xxxMethod()的方式来调用，我们先来看看NativeModules.js的实现。
 
-### 实现细节-JavaScript层
+### 实现细节（JavaScript层）
 
-#### 1 NativeModules.
+#### 1 NativeModules.xxxModule.xxxMethod()
 
 当我们用NativeModules.xxxModule.xxxMethod()这种方式去调用时，JS就会通过JS层的NativeModules去查找相对应的Java Module。
 
@@ -1006,9 +1101,8 @@ ToastAndroid.show('Awesome', ToastAndroid.SHORT);
 ```javascript
 
 let NativeModules : {[moduleName: string]: Object} = {};
-if (global.nativeModuleProxy) {
-  //nativeModuleProxy实质上是在启动流程中，JSCExecutor::JSCExecutor()在创建时通过installGlobalProxy(m_context, "nativeModuleProxy", exceptionWrapMethod<&JSCExecutor::getNativeModule>())
-  //创建的，所以当JS调用NativeModules时，实际上在调用JSCExecutor::getNativeModule()方法。
+  
+  //可以看到Native被赋值为global.nativeModuleProxy，nativeModuleProxy是一个全局变量，顾名思义，它是NativeModules.js在C++层的代理。
   NativeModules = global.nativeModuleProxy;
 } else {
   const bridgeConfig = global.__fbBatchedBridgeConfig;
@@ -1036,8 +1130,12 @@ if (global.nativeModuleProxy) {
 
 module.exports = NativeModules;
 ```
+
+
 nativeModuleProxy实质上是在启动流程中，JSCExecutor::JSCExecutor()在创建时通过installGlobalProxy(m_context, "nativeModuleProxy", exceptionWrapMethod<&JSCExecutor::getNativeModule>())
 创建的，所以当JS调用NativeModules时，实际上在调用JSCExecutor::getNativeModule()方法，我们来看一看该方法的实现。
+
+#### 2 JSCExecutor::getNativeModule(JSObjectRef object, JSStringRef propertyName)
 
 ```c++
 
@@ -1051,6 +1149,8 @@ JSValueRef JSCExecutor::getNativeModule(JSObjectRef object, JSStringRef property
 ```
 
 该方法进一步调用JSCNativeModules.cpp的getModule()方法，我们来看看它的实现。
+
+#### 3 JSCNativeModules::getModule(JSContextRef context, JSStringRef jsName)
 
 **JSCNativeModules.cpp**
 
@@ -1189,6 +1289,8 @@ folly::Optional<ModuleConfig> ModuleRegistry::getConfig(const std::string& name)
 
 获取到相应ModuleConfig就会去调用NativeModules.js的genModule()生成JS将要调用对应的JS Module。
 
+#### 4 NativeModules.genModule(config: ?ModuleConfig, moduleID: number): ?{name: string, module?: Object}
+
 **NativeModules.js**
 
 ```javascript
@@ -1277,6 +1379,8 @@ function genMethod(moduleID: number, methodID: number, type: MethodType) {
 ```
 该函数会根据函数类型的不同做不同的处理，但最终都会调用BatchedBridge.enqueueNativeCall()方法，我们来看看它的实现。
 
+#### 5 MessageQueue.enqueueNativeCall(moduleID: number, methodID: number, params: Array<any>, onFail: ?Function, onSucc: ?Function)
+
 **MessageQueue.js**
 
 ```javascript
@@ -1355,6 +1459,8 @@ function genMethod(moduleID: number, methodID: number, type: MethodType) {
 
 我们再来看看JSCExecutor::nativeFlushQueueImmediate(size_t argumentCount, const JSValueRef arguments[]) 的实现。
 
+#### 6 JSValueRef JSCExecutor::nativeFlushQueueImmediate(size_t argumentCount, const JSValueRef arguments[])
+
 **JSCExecutor.cpp**
 
 ```c++
@@ -1377,6 +1483,8 @@ void JSCExecutor::flushQueueImmediate(Value&& queue) {
 ```
 可以看出nativeFlushQueueImmediate()会进一步调用flushQueueImmediate()方法，m_delegate的类型是ExecutorDelegate，事实上它调用的是ExecutorDelegate的子类
 JsToNativeBridge.cpp的callNativeModules()方法，我们回想一下上面我们分析Java代码调用JS代码第7步的实现，它也同样走到了这个方法，只是传入的isEndOfBatch=true。
+
+#### 7 JsToNativeBridge::callNativeModules()
 
 **JsToNativeBridge.cpp**
 
@@ -1411,6 +1519,8 @@ JsToNativeBridge.cpp的callNativeModules()方法，我们回想一下上面我�
 
 在该方法中取出JS队列中的JS调用Java的所有方法，并通过ModuleRegistry::callNativeMethod()方法去遍历调用，我们来看看这个方法的实现。
 
+#### 8 ModuleRegistry::callNativeMethod(ExecutorToken token, unsigned int moduleId, unsigned int methodId, folly::dynamic&& params, int callId)
+
 ```c++
 void ModuleRegistry::callNativeMethod(ExecutorToken token, unsigned int moduleId, unsigned int methodId,
                                       folly::dynamic&& params, int callId) {
@@ -1434,7 +1544,11 @@ void ModuleRegistry::callNativeMethod(ExecutorToken token, unsigned int moduleId
 ```
 
 modules_的类型是std::vector<std::unique_ptr<NativeModule>> modules_，NativeModule是C++层针对Java Module的一种包装，NativeModule的子类是JavaNativeModule，
-我们去看看它的调用方法invoke()
+我们去看看它的调用方法invoke().
+
+#### 9 JavaNativeModule::invoke(ExecutorToken token, unsigned int reactMethodId, folly::dynamic&& params)
+
+抽象类NativeModule定义的纯虚函数（抽象方法）
 
 **NativeModule.cpp**
 
@@ -1456,6 +1570,9 @@ class NativeModule {
 }
 
 ```
+NativeModule有2个子类，它的类图如下所示：
+
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/6/UMLClassDiagram-NativeModule.png"/>
 
 ```c++
 class JavaNativeModule : public NativeModule {
@@ -1473,6 +1590,8 @@ class JavaNativeModule : public NativeModule {
 ```
 
 该方法调用通过反射调用Java层的JavaModuleWrapper.java的invoke()方法，同时把mothodId和参数传过去。我们来看看JavaModuleWrapper.java的invoke()方法的实现。
+
+#### 10 JavaModuleWrapper.invoke(ExecutorToken token, int methodId, ReadableNativeArray parameters)
 
 ```java
 
@@ -1496,21 +1615,5 @@ public class JavaModuleWrapper {
 JavaModuleWrapper对应C++层的NativeModule，该类针对Java BaseJavaModule进行了包装，是的C++层可以更加方便的通过JNI调用Java Module。
 
 
-自此，JS代码完成了对Java代码的调用，我们再来总结一下整个流程。
 
-JS层
-
-```
-1 JS代码主动调用Java层实现的相关方法，将管管方法添加到JS队列等待Java层主动拉取或者调用
-```
-
-C++层
-
-```
-```
-
-Java层
-
-```
-```
 

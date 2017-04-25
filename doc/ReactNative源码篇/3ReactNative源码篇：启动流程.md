@@ -801,6 +801,7 @@ MessageQueueThread moduleQueue：Native线程，通过mReactQueueConfiguration.g
 Collection<JavaModuleWrapper> javaModules：java modules，来源于mJavaRegistry.getJavaModules(this)。
 Collection<ModuleHolder> cxxModules)：c++ modules，来源于mJavaRegistry.getCxxModules()。
 ```
+
 CatalystInstanceImpl被创建以后，便进行JS的加载。从上面第5步：ReactInstanceManager.createReactContext()方法可以知道，该函数会调
 用CatalystInstanceImpl.runJSBundle()来加载JS Bundle。我们开看一下它的实现。
 
@@ -1132,43 +1133,8 @@ void JSCExecutor::flush() {
   }
 }
 ```
-
-通过上面代码可知，最终又调用了JsToNativeBridge.cpp的callNativeModules()方法。我们再来看看这个方法的实现：
-
-JsToNativeBridge.cpp
-
-```c++
-  void callNativeModules(
-      JSExecutor& executor, folly::dynamic&& calls, bool isEndOfBatch) override {
-
-    CHECK(m_registry || calls.empty()) <<
-      "native module calls cannot be completed with no native modules";
-    ExecutorToken token = m_nativeToJs->getTokenForExecutor(executor);
-    //放到NativeQueue的线程队列中去等待执行
-    m_nativeQueue->runOnQueue([this, token, calls=std::move(calls), isEndOfBatch] () mutable {
-      // An exception anywhere in here stops processing of the batch.  This
-      // was the behavior of the Android bridge, and since exception handling
-      // terminates the whole bridge, there's not much point in continuing.
-      for (auto& call : react::parseMethodCalls(std::move(calls))) {
-        //调用NativeModuleRegistry中的Java Native方法。
-        m_registry->callNativeMethod(
-          token, call.moduleId, call.methodId, std::move(call.arguments), call.callId);
-      }
-      if (isEndOfBatch) {
-        m_callback->onBatchComplete();
-        m_callback->decrementPendingJSCalls();
-      }
-    });
-  }
-```
-
-我们先来看看这个函数的3个参数：
-
-```
-JSExecutor& executor：即前面我们分析过的JSCExecutor
-folly::dynamic&& calls：解析成功的JS的JSON通信参数结构
-bool isEndOfBatch：通知当前的JS Bundle是否处理完成。
-```
+m_flushedQueueJS支线的是MessageQueue.js的flushedQueue()方法，此时JS已经被加载到队列中，等待Java层来驱动它。加载完JS后
+ReactContextInitAsyncTask的后台任务执行完成，进入到异步任务的onPostExecute()方法继续
 
 JS Bundle加载并解析完成后，ReactContextInitAsyncTask的后台任务完成，进入onPostExecute()方法，我们继续跟进它的实现。
 
@@ -1270,7 +1236,7 @@ public class ReactInstanceManager {
     rootView.setRootViewTag(rootTag);
 
     //包装启动参数launchOptions与模块名jsAppModuleName
-    @Nullable Bundle launchOptions与模块名 = rootView.getLaunchOptions();
+    @Nullable Bundle lau∂nchOptions与模块名 = rootView.getLaunchOptions();
     WritableMap initialProps = Arguments.makeNativeMap(launchOptions);
     String jsAppModuleName = rootView.getJSModuleName();
 

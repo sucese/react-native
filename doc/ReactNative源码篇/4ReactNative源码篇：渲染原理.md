@@ -26,7 +26,14 @@ star文章, 关注文章的最新的动态。另外建议大家去Github上浏�
 - [4ReactNative源码篇：渲染原理](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/4ReactNative源码篇：渲染原理.md)
 - [5ReactNative源码篇：线程模型](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/5ReactNative源码篇：线程模型.md)
 - [6ReactNative源码篇：通信机制](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/6ReactNative源码篇：通信机制.md)
-                
+
+在分析RN的渲染原理之前，我们先理解相关的核心概念。
+
+UIManagerModule继承于ReactContextBaseJavaModule，该Module可以让JS在Native上创建并更新Views。
+
+UIImplementation接收JS传递类创建VIew的指令，
+
+
 ## 工作机制
 
 ### 状态机
