@@ -155,3 +155,27 @@ Java Module映射表
 ```
 
 
+# 附录
+
+为了方便大家理解，准备了导读PPT。
+
+
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/ppt/幻灯片01.png"/>
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/ppt/幻灯片02.png"/>
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/ppt/幻灯片03.png"/>
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/ppt/幻灯片04.png"/>
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/ppt/幻灯片05.png"/>
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/ppt/幻灯片06.png"/>
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/ppt/幻灯片07.png"/>
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/ppt/幻灯片08.png"/>
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/ppt/幻灯片09.png"/>
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/ppt/幻灯片10.png"/>
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/ppt/幻灯片11.png"/>
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/ppt/幻灯片12.png"/>
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/ppt/幻灯片13.png"/>
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/ppt/幻灯片14.png"/>
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/ppt/幻灯片15.png"/>
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/ppt/幻灯片16.png"/>
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/ppt/幻灯片17.png"/>
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/ppt/幻灯片18.png"/>
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/ppt/幻灯片19.png"/>
