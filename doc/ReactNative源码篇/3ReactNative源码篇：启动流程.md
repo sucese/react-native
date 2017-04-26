@@ -138,7 +138,8 @@ AppRegistry.registerComponent('standard_project', () => standard_project);
 以上便是RN开发的三个步骤，本篇文章我们重点关注RN应用的启动流程，具体说来，有以下几个方面：
 
 ```
-1 RN应用的启动调用流程，各组件完成的功能。
+1 RN应用的启动的函数调用链，分析流程细节。
+2 RN应用启动过程中创建了哪些组件，这些组件各自都由什么功能。
 ```
 
 在正式分析启动流程之前，我们先来了解和启动流程相关的一些重要概念。
@@ -180,13 +181,11 @@ JavaScriptModule：JS暴露给Java调用的API集合，例如：AppRegistry、De
 即可。
 ```
 
-好，了解了这些重要概念，我们开始分析整个RN的启动流程。
-
-## 执行器的实现
+## 一 执行器的实现
 
 在C++层的Executor.h文件中同一定义了执行Native代码的抽象类ExecutorDelegate，以及执行JS代码的抽象类JSExecutor。
 
-### Native代码执行器
+### 1.1 Native代码执行器
 
 ExecutorDelegate：在Executor.h中定义，由JsToNativeBridge实现，该抽象类用于JS代码调用Native代码，该类的类图如下所示：
 
@@ -218,7 +217,7 @@ class ExecutorDelegate {
 };
 ```
 
-### JS代码执行器
+### 1.2 JS代码执行器
 
 JS的解析是在Webkit-JavaScriptCore中完成的，JSCExexutor.cpp对JavaScriptCore的功能做了进一步的封装，我们来看一下它的实现。
 
@@ -285,9 +284,7 @@ setJSExecutor()，具体可以参见JavaJSExecutor与ProxyJavaScriptExecutor，�
 <img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/3/UMLClassDiagram-cxxbridge-ProxyJavaScriptExecutor.png"/>
 
 
-## RN应用的启动流程
-
-### 实现概要
+## 二 RN应用的启动流程
 
 >一句话概括启动流程：先是应用终端启动并创建应用上下文，应用上下文启动JS Runtime，进行布局，再由应用终端进行渲染，最后将渲染的View添加到ReactRootView上，最终呈现在用户面前。
 
@@ -326,7 +323,7 @@ ReactActivity继承于Activity，并实现了它的生命周期方法。ReactAct
 
 所以我们主要来关注ReactActivityDelegate的实现。我们先来看看ReactActivityDelegate的onCreate()方法。
 
-#### 1 ReactActivityDelegate.onCreate(Bundle savedInstanceState)
+### 2.1 ReactActivityDelegate.onCreate(Bundle savedInstanceState)
 
 ```java
 public class ReactActivityDelegate {
@@ -380,7 +377,7 @@ public class ReactActivityDelegate {
 
 尅看出RN真正核心的地方就在于ReactRootView，它就是一个View，你可以像用其他UI组件那样把它用在Android应用的任何地方。好，我们进一步去ReactRootView看启动流程。
 
-#### 2 ReactRootView.startReactApplication( ReactInstanceManager reactInstanceManager, String moduleName, @Nullable Bundle launchOptions)
+### 2.2 ReactRootView.startReactApplication( ReactInstanceManager reactInstanceManager, String moduleName, @Nullable Bundle launchOptions)
 
 ```java
 public class ReactRootView extends SizeMonitoringFrameLayout implements RootView {
@@ -433,7 +430,7 @@ Bundle launchOptions：Bundle类型的数据，如果我们不继承ReactActivit
 
 我们可以看到，ReactRootView.startReactApplication()方法里最终会调用ReactInstanceManager.createReactContextInBackground()来创建RN应用的上下文。
 
-#### 3 ReactInstanceManager.createReactContextInBackground()
+### 2.3 ReactInstanceManager.createReactContextInBackground()
 
 ```java
 public class ReactInstanceManager {
@@ -560,7 +557,7 @@ ReactInstanceManager.createReactContextInBackground()
 
 该方法启动了一个ReactContextInitAsyncTask的异步任务去执行的创建。
 
-#### 4 ReactInstanceManager.ReactContextInitAsyncTask.doInBackground(ReactContextInitParams... params) 
+### 2.4 ReactInstanceManager.ReactContextInitAsyncTask.doInBackground(ReactContextInitParams... params) 
 
 ```java
 public class ReactInstanceManager {
@@ -610,7 +607,7 @@ JSBundleLoader jsBundleLoader：缓存了JSBundle的信息，封装了上层加�
 
 接下来调用ReactInstanceManager.createReactContext()，真正开始创建ReactContext。
 
-#### 5 ReactInstanceManager.createReactContext( JavaScriptExecutor jsExecutor, JSBundleLoader jsBundleLoader)
+### 2.5 ReactInstanceManager.createReactContext( JavaScriptExecutor jsExecutor, JSBundleLoader jsBundleLoader)
 
 ```java
 public class ReactInstanceManager {
@@ -743,7 +740,7 @@ CatalystInstance.runJSBundle() -> JSBundleLoader.loadScript() -> CatalystInstanc
 ```
 最终由C++中的JSCExecutor.cpp完成了JS Bundle的加载，核心逻辑都在JSCExecutor.cpp中，这一块的内容我们后续的文章在详细分析，我们先来看看CatalystInstanceImpl的创建流程。
 
-#### 6 CatalystInstanceImpl.CatalystInstanceImpl( final ReactQueueConfigurationSpec ReactQueueConfigurationSpec, final JavaScriptExecutor jsExecutor, final NativeModuleRegistry registry, final JavaScriptModuleRegistry jsModuleRegistry, final JSBundleLoader jsBundleLoader, NativeModuleCallExceptionHandler nativeModuleCallExceptionHandler) 
+### 2.6 CatalystInstanceImpl.CatalystInstanceImpl( final ReactQueueConfigurationSpec ReactQueueConfigurationSpec, final JavaScriptExecutor jsExecutor, final NativeModuleRegistry registry, final JavaScriptModuleRegistry jsModuleRegistry, final JSBundleLoader jsBundleLoader, NativeModuleCallExceptionHandler nativeModuleCallExceptionHandler) 
 
 ```java
 public class CatalystInstanceImpl implements CatalystInstance {
@@ -809,7 +806,7 @@ Collection<ModuleHolder> cxxModules)：c++ modules，来源于mJavaRegistry.getC
 CatalystInstanceImpl被创建以后，便进行JS的加载。从上面第5步：ReactInstanceManager.createReactContext()方法可以知道，该函数会调
 用CatalystInstanceImpl.runJSBundle()来加载JS Bundle。我们开看一下它的实现。
 
-#### 7 CatalystInstanceImpl.runJSBundle()
+### 2.7 CatalystInstanceImpl.runJSBundle()
 
 ···java
 public class CatalystInstanceImpl{
@@ -870,7 +867,7 @@ public abstract class JSBundleLoader {
 
 可以看出，它会继续调用CatalystInstanceImpl.loadScriptFromAssets()方法去加载JS Bundle，该方法的实现如下所示：
 
-#### 8 CatalystInstanceImpl.loadScriptFromAssets(AssetManager assetManager, String assetURL) 
+### 2.8 CatalystInstanceImpl.loadScriptFromAssets(AssetManager assetManager, String assetURL) 
 
 ```java
 public class CatalystInstanceImpl {
@@ -891,7 +888,7 @@ CatalystInstanceImpl.java最终还是调用C++层的CatalystInstanceImpl.cpp去�
 
 可以看出该方法最终调用Native方法jniLoadScriptFromAssets去加载JS Bundle，该方法的实现如下所示：
 
-#### 9 CatalystInstanceImpl::jniLoadScriptFromAssets(jni::alias_ref<JAssetManager::javaobject> assetManager, const std::string& assetURL)
+### 2.9 CatalystInstanceImpl::jniLoadScriptFromAssets(jni::alias_ref<JAssetManager::javaobject> assetManager, const std::string& assetURL)
 
 CatalystInstanceImpl.cpp
 
@@ -924,7 +921,7 @@ void CatalystInstanceImpl::jniLoadScriptFromAssets(
 ```
 接着会调用Instance.cpp的loadScriptFromString()方法去解析JS Bundle里的内容。 
 
-#### 10 Instance::loadScriptFromString(std::unique_ptr<const JSBigString> string, std::string sourceURL)
+### 2.10 Instance::loadScriptFromString(std::unique_ptr<const JSBigString> string, std::string sourceURL)
 
 Instance.cpp
 
@@ -942,7 +939,7 @@ void Instance::loadScriptFromString(std::unique_ptr<const JSBigString> string,
 
 loadScriptFromString()进一步调用NativeToJsBridge.cpp的loadApplication()方法，它的实现如下所示：
 
-#### 11 NativeToJsBridge::loadApplication(std::unique_ptr<JSModulesUnbundle> unbundle, std::unique_ptr<const JSBigString> startupScript, std::string startupScriptSourceURL) 
+### 2.11 NativeToJsBridge::loadApplication(std::unique_ptr<JSModulesUnbundle> unbundle, std::unique_ptr<const JSBigString> startupScript, std::string startupScriptSourceURL) 
 
 NativeToJsBridge.cpp
 
@@ -989,7 +986,9 @@ std::string startupScriptSourceURL：bundle的文件名。
 
 该函数进一步调用JSExecutor.cpp的loadApplicationScript()方法。
 
-#### 12 JSCExecutor::loadApplicationScript(std::unique_ptr<const JSBigString> script, std::string sourceURL) 
+### 2.12 JSCExecutor::loadApplicationScript(std::unique_ptr<const JSBigString> script, std::string sourceURL) 
+
+到了这个方法，就是去真正加载JS文件了。
 
 JSExecutor.cpp
 
@@ -1094,11 +1093,30 @@ void JSCExecutor::bindBridge() throw(JSException) {
   }
 
   auto batchedBridge = batchedBridgeValue.asObject();
+  //callFunctionReturnFlushedQueue这些都是MessageQueue.js层里的方法
   m_callFunctionReturnFlushedQueueJS = batchedBridge.getProperty("callFunctionReturnFlushedQueue").asObject();
   m_invokeCallbackAndReturnFlushedQueueJS = batchedBridge.getProperty("invokeCallbackAndReturnFlushedQueue").asObject();
   //通过Webkit JSC获取MessageQueue.js的flushedQueue。
   m_flushedQueueJS = batchedBridge.getProperty("flushedQueue").asObject();
   m_callFunctionReturnResultAndFlushedQueueJS = batchedBridge.getProperty("callFunctionReturnResultAndFlushedQueue").asObject();
+}
+
+void JSCExecutor::flush() {
+  SystraceSection s("JSCExecutor::flush");
+  if (!m_delegate) {
+    // do nothing
+  } else if (!m_delegate->getModuleRegistry()) {
+    callNativeModules(Value::makeNull(m_context));
+  } else {
+    // If this is failing, chances are you have provided a delegate with a
+    // module registry, but haven't loaded the JS which enables native function
+    // queueing.  Add BatchedBridge.js to your bundle, pass a nullptr delegate,
+    // or make delegate->getModuleRegistry() return nullptr.
+    CHECK(m_flushedQueueJS) << "Attempting to use native methods without loading BatchedBridge.js";
+    //m_flushedQueueJS->callAsFunction({})等于调用MessageQueue.js的flushedQUeue()方法，即把JS层相关通信数据通过flushedQUeue()
+    //返回给callNativeModules
+    callNativeModules(m_flushedQueueJS->callAsFunction({}));
+  }
 }
 
 void JSCExecutor::callNativeModules(Value&& value) {
@@ -1119,23 +1137,6 @@ void JSCExecutor::callNativeModules(Value&& value) {
   }
 }
 
-void JSCExecutor::flush() {
-  SystraceSection s("JSCExecutor::flush");
-  if (!m_delegate) {
-    // do nothing
-  } else if (!m_delegate->getModuleRegistry()) {
-    callNativeModules(Value::makeNull(m_context));
-  } else {
-    // If this is failing, chances are you have provided a delegate with a
-    // module registry, but haven't loaded the JS which enables native function
-    // queueing.  Add BatchedBridge.js to your bundle, pass a nullptr delegate,
-    // or make delegate->getModuleRegistry() return nullptr.
-    CHECK(m_flushedQueueJS) << "Attempting to use native methods without loading BatchedBridge.js";
-    //m_flushedQueueJS->callAsFunction({})等于调用MessageQueue.js的flushedQUeue()方法，即把JS层相关通信数据通过flushedQUeue()
-    //返回给callNativeModules
-    callNativeModules(m_flushedQueueJS->callAsFunction({}));
-  }
-}
 ```
 m_flushedQueueJS支线的是MessageQueue.js的flushedQueue()方法，此时JS已经被加载到队列中，等待Java层来驱动它。加载完JS后
 ReactContextInitAsyncTask的后台任务执行完成，进入到异步任务的onPostExecute()方法继续
@@ -1146,7 +1147,7 @@ JS Bundle加载并解析完成后，ReactContextInitAsyncTask的后台任务完�
 
 当ReactContext被创建以后，变回继续执行ReactContextInitAsyncTask.onPostExecute()方法。
 
-#### 13 ReactInstanceManager.ReactContextInitAsyncTask.onPostExecute(Result<ReactApplicationContext> result)
+### 2.13 ReactInstanceManager.ReactContextInitAsyncTask.onPostExecute(Result<ReactApplicationContext> result)
 
 ```java
 public class ReactInstanceManager {
@@ -1182,7 +1183,7 @@ public class ReactInstanceManager {
 
 doInBackground()做完事情之后，onPostExecute()会去调用ReactInstanceManager.setupReactContext()，它的实现如下所示：
 
-#### 14 ReactInstanceManager.setupReactContext(ReactApplicationContext reactContext)
+### 2.14 ReactInstanceManager.setupReactContext(ReactApplicationContext reactContext)
 
 ```java
 public class ReactInstanceManager {
@@ -1262,7 +1263,7 @@ public class ReactInstanceManager {
 ReactInstanceManager.attachMeasuredRootViewToInstance()最终进入了RN应用的启动流程入口，调用catalystInstance.getJSModule(AppRegistry.class).runApplication(jsAppModuleName, appParams)，
 AppRegistry.class是JS层暴露给Java层的接口方法。它的真正实现在AppRegistry.js里，AppRegistry.js是运行所有RN应用的JS层入口，我们来看看它的实现：
 
-#### 15 AppRegistry.runApplication(appKey: string, appParameters: any)
+### 2.15 AppRegistry.runApplication(appKey: string, appParameters: any)
 
 **AppRegistry.js**
 
@@ -1296,6 +1297,7 @@ AppRegistry.class是JS层暴露给Java层的接口方法。它的真正实现在
 
 ```
 
+到这里就会去调用JS进行组件渲染，再通过Java层的UIManagerModule将JS组件转换为Android组件，最终显示在ReactRootView上。
 
 
 
