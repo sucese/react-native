@@ -26,7 +26,6 @@ star文章, 关注文章的最新的动态。另外建议大家去Github上浏�
 - [4ReactNative源码篇：渲染原理](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/4ReactNative源码篇：渲染原理.md)
 - [5ReactNative源码篇：线程模型](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/5ReactNative源码篇：线程模型.md)
 - [6ReactNative源码篇：通信机制](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/6ReactNative源码篇：通信机制.md)
-								
 
 源码地址：https://github.com/facebook/react-native
 
@@ -39,7 +38,6 @@ star文章, 关注文章的最新的动态。另外建议大家去Github上浏�
 1. ReactNative系统框架是怎样的？
 2. ReactNative系统框架的主线在哪里，有哪些支线，如何去分析这些线路？
 ```
-
 好，我们先来看第一个问题。
 
 ## ReactNative系统框架概述
