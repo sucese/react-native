@@ -44,7 +44,7 @@ star文章, 关注文章的最新的动态。另外建议大家去Github上浏�
 
 ReactNative源码结构图
 
-<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/1/source_code_structure_2.png"/>
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/1/source_code_structure_package.png"/>
 
 ```
 - jni：ReactNative的好多机制都是由C、C++实现的，这部分便是用来载入SO库。
@@ -58,7 +58,7 @@ ReactNative源码结构图
 
 react依赖另外几个包，它们的调用关系如下图所示：
 
-<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/1/source_code_structure_3.png" width="1000"/>
+<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/1/source_code_structure_call.png" width="1000"/>
 
 ReactNative系统框架图如下所示：
 
