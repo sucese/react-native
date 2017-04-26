@@ -1,4 +1,4 @@
-# ReactNative源码篇：渲染原理
+# ReactNative源码篇：代码调用
 
 作者: 郭孝星  
 邮箱: guoxiaoxingse@163.com  

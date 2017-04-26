@@ -1,3 +1,5 @@
+# ReactNative源码篇：通信机制
+
 作者: 郭孝星  
 邮箱: guoxiaoxingse@163.com  
 博客: http://blog.csdn.net/allenwells   
@@ -400,8 +402,6 @@ public:
   virtual ~JSExecutor() {}
 };
 ```
-
-
 ### 2.3 关于通信桥在JS层的实现
 
 JS层Libraries/BatchedBridge包下面有3个JS文件：BatchedBridge.js、MessageQueue.js、NativeModules.js，它们封装了通信桥在JS层的实现。
