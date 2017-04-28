@@ -20,13 +20,13 @@ star文章, 关注文章的最新的动态。另外建议大家去Github上浏�
 
 >本篇系列文章主要分析ReactNative源码，分析ReactNative的启动流程、渲染原理、通信机制与线程模型等方面内容。
 
-- [1ReactNative源码篇：源码初识](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/1ReactNative源码篇：源码初识.md)
-- [2ReactNative源码篇：代码调用](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/2ReactNative源码篇：代码调用.md)
-- [3ReactNative源码篇：启动流程](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/3ReactNative源码篇：启动流程.md)
-- [4ReactNative源码篇：渲染原理](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/4ReactNative源码篇：渲染原理.md)
-- [5ReactNative源码篇：线程模型](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/5ReactNative源码篇：线程模型.md)
-- [6ReactNative源码篇：通信机制](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/6ReactNative源码篇：通信机制.md)
-						
+- [1ReactNative源码篇：源码初识](https://github.com/guoxiaoxing/react-native-android-container/blob/master/doc/ReactNative源码篇/1ReactNative源码篇：源码初识.md)
+- [2ReactNative源码篇：代码调用](https://github.com/guoxiaoxing/react-native-android-container/blob/master/doc/ReactNative源码篇/2ReactNative源码篇：代码调用.md)
+- [3ReactNative源码篇：启动流程](https://github.com/guoxiaoxing/react-native-android-container/blob/master/doc/ReactNative源码篇/3ReactNative源码篇：启动流程.md)
+- [4ReactNative源码篇：渲染原理](https://github.com/guoxiaoxing/react-native-android-container/blob/master/doc/ReactNative源码篇/4ReactNative源码篇：渲染原理.md)
+- [5ReactNative源码篇：线程模型](https://github.com/guoxiaoxing/react-native-android-container/blob/master/doc/ReactNative源码篇/5ReactNative源码篇：线程模型.md)
+- [6ReactNative源码篇：通信机制](https://github.com/guoxiaoxing/react-native-android-container/blob/master/doc/ReactNative源码篇/6ReactNative源码篇：通信机制.md)
+		
 ## Java与C++的交互
 
 我们都知道如果需要用Java调用C/C++，需要用到Java中的JNI，但是用过JNI的同学都知道这是个繁琐且低效的调用方式，在大型工程体现的更加明显，因为我们需要将Java与C/C++的
