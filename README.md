@@ -24,7 +24,7 @@
 
 >本篇系列文章主要介绍ReactNative的基本组件以及一些基本用法。
 
-- [1ReactNative实践篇：环境配置与编译](https://github.com/guoxiaoxing/react-native-android-container/blob/master/doc/ReactNative基础篇/1ReactNative实践篇：环境配置与编译.md)
+- [1ReactNative实践篇：环境配置与编译](https://github.com/guoxiaoxing/react-native/blob/master/doc/ReactNative基础篇/1ReactNative实践篇：环境配置与编译.md)
 - 2ReactNative实践篇：基本概念
 - 3ReactNative实践篇：基本组件-View
 - 4ReactNative实践篇：基本组件-Text、TextInput与Button
@@ -48,12 +48,12 @@
 
 >本篇系列文章主要分析ReactNative源码，分析ReactNative的启动流程、渲染原理、通信机制与线程模型等方面内容。
 
-- [1ReactNative源码篇：源码初识](https://github.com/guoxiaoxing/react-native-android-container/blob/master/doc/ReactNative源码篇/1ReactNative源码篇：源码初识.md)
-- [2ReactNative源码篇：代码调用](https://github.com/guoxiaoxing/react-native-android-container/blob/master/doc/ReactNative源码篇/2ReactNative源码篇：代码调用.md)
-- [3ReactNative源码篇：启动流程](https://github.com/guoxiaoxing/react-native-android-container/blob/master/doc/ReactNative源码篇/3ReactNative源码篇：启动流程.md)
-- [4ReactNative源码篇：渲染原理](https://github.com/guoxiaoxing/react-native-android-container/blob/master/doc/ReactNative源码篇/4ReactNative源码篇：渲染原理.md)
-- [5ReactNative源码篇：线程模型](https://github.com/guoxiaoxing/react-native-android-container/blob/master/doc/ReactNative源码篇/5ReactNative源码篇：线程模型.md)
-- [6ReactNative源码篇：通信机制](https://github.com/guoxiaoxing/react-native-android-container/blob/master/doc/ReactNative源码篇/6ReactNative源码篇：通信机制.md)
+- [1ReactNative源码篇：源码初识](https://github.com/guoxiaoxing/react-native/blob/master/doc/ReactNative源码篇/1ReactNative源码篇：源码初识.md)
+- [2ReactNative源码篇：代码调用](https://github.com/guoxiaoxing/react-native/blob/master/doc/ReactNative源码篇/2ReactNative源码篇：代码调用.md)
+- [3ReactNative源码篇：启动流程](https://github.com/guoxiaoxing/react-native/blob/master/doc/ReactNative源码篇/3ReactNative源码篇：启动流程.md)
+- [4ReactNative源码篇：渲染原理](https://github.com/guoxiaoxing/react-native/blob/master/doc/ReactNative源码篇/4ReactNative源码篇：渲染原理.md)
+- [5ReactNative源码篇：线程模型](https://github.com/guoxiaoxing/react-native/blob/master/doc/ReactNative源码篇/5ReactNative源码篇：线程模型.md)
+- [6ReactNative源码篇：通信机制](https://github.com/guoxiaoxing/react-native/blob/master/doc/ReactNative源码篇/6ReactNative源码篇：通信机制.md)
 					
 ## ReactNative实践篇
 

@@ -16,16 +16,16 @@
 star文章, 关注文章的最新的动态。另外建议大家去Github上浏览文章，一方面文章的写作都是在Github上进行的，所以Github上的更新是最及时
 的，另一方面感觉Github对Markdown的支持更好，文章的渲染也更加美观。
 
-文章目录：https://github.com/guoxiaoxing/react-native-android-container/blob/master/README.md
+文章目录：https://github.com/guoxiaoxing/react-native/blob/master/README.md
 
 >本篇系列文章主要分析ReactNative源码，分析ReactNative的启动流程、渲染原理、通信机制与线程模型等方面内容。
 
-- [1ReactNative源码篇：源码初识](https://github.com/guoxiaoxing/react-native-android-container/blob/master/doc/ReactNative源码篇/1ReactNative源码篇：源码初识.md)
-- [2ReactNative源码篇：代码调用](https://github.com/guoxiaoxing/react-native-android-container/blob/master/doc/ReactNative源码篇/2ReactNative源码篇：代码调用.md)
-- [3ReactNative源码篇：启动流程](https://github.com/guoxiaoxing/react-native-android-container/blob/master/doc/ReactNative源码篇/3ReactNative源码篇：启动流程.md)
-- [4ReactNative源码篇：渲染原理](https://github.com/guoxiaoxing/react-native-android-container/blob/master/doc/ReactNative源码篇/4ReactNative源码篇：渲染原理.md)
-- [5ReactNative源码篇：线程模型](https://github.com/guoxiaoxing/react-native-android-container/blob/master/doc/ReactNative源码篇/5ReactNative源码篇：线程模型.md)
-- [6ReactNative源码篇：通信机制](https://github.com/guoxiaoxing/react-native-android-container/blob/master/doc/ReactNative源码篇/6ReactNative源码篇：通信机制.md)
+- [1ReactNative源码篇：源码初识](https://github.com/guoxiaoxing/react-native/blob/master/doc/ReactNative源码篇/1ReactNative源码篇：源码初识.md)
+- [2ReactNative源码篇：代码调用](https://github.com/guoxiaoxing/react-native/blob/master/doc/ReactNative源码篇/2ReactNative源码篇：代码调用.md)
+- [3ReactNative源码篇：启动流程](https://github.com/guoxiaoxing/react-native/blob/master/doc/ReactNative源码篇/3ReactNative源码篇：启动流程.md)
+- [4ReactNative源码篇：渲染原理](https://github.com/guoxiaoxing/react-native/blob/master/doc/ReactNative源码篇/4ReactNative源码篇：渲染原理.md)
+- [5ReactNative源码篇：线程模型](https://github.com/guoxiaoxing/react-native/blob/master/doc/ReactNative源码篇/5ReactNative源码篇：线程模型.md)
+- [6ReactNative源码篇：通信机制](https://github.com/guoxiaoxing/react-native/blob/master/doc/ReactNative源码篇/6ReactNative源码篇：通信机制.md)
             							
 在分析具体的启动流程之前，我们先从Demo代码入手，对外部的代码有个大致的印象，我们才能进一步去了解内部的逻辑。
 
@@ -158,7 +158,7 @@ AppRegistry.registerComponent('standard_project', () => standard_project);
 
 我们来了解一下ReactContext的具体实现与功能，先来看一下它的类图：
 
-<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/2/UMLClassDiagram-bridge-ReactContext.png"/>
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/2/UMLClassDiagram-bridge-ReactContext.png"/>
 
 从上图可以看出，ReactContext继承与ContextWrapper，并有子类：
 
@@ -189,7 +189,7 @@ JavaScriptModule：JS暴露给Java调用的API集合，例如：AppRegistry、De
 
 ExecutorDelegate：在Executor.h中定义，由JsToNativeBridge实现，该抽象类用于JS代码调用Native代码，该类的类图如下所示：
 
-<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/6/UMLClassDiagram-ExecutorDelegate.png"/>
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/6/UMLClassDiagram-ExecutorDelegate.png"/>
 
 ```c++
 
@@ -226,7 +226,7 @@ JSExecutor：在Executor.h中定义，正如它的名字那样，它是用来执
 
 我们先来看一下JSExecutor的类图，可以看到
 
-<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/3/UMLClassDiagram-JSExecutor.png"/>
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/3/UMLClassDiagram-JSExecutor.png"/>
 
 ```c++
 class JSExecutor {
@@ -281,7 +281,7 @@ public:
 可以看到除了JSExecutor.cpp实现了抽象类JSExecutor里的方法，ProxyExecutor.cpp也实现了它里面的方法，这是RN给了我们自定义JS解析器的能力，可以在CatalystInstance.Builder里
 setJSExecutor()，具体可以参见JavaJSExecutor与ProxyJavaScriptExecutor，它们的类图如下所示：
 
-<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/3/UMLClassDiagram-cxxbridge-ProxyJavaScriptExecutor.png"/>
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/3/UMLClassDiagram-cxxbridge-ProxyJavaScriptExecutor.png"/>
 
 
 ## 二 RN应用的启动流程
@@ -290,7 +290,7 @@ setJSExecutor()，具体可以参见JavaJSExecutor与ProxyJavaScriptExecutor，�
 
 RN应用的启动流程图如下所示：
 
-<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/3/react_native_start_flow_structure.png"/>
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/3/react_native_start_flow_structure.png"/>
 
 详细流程：
 
@@ -311,7 +311,7 @@ ReactRootView加载进来，并调用RN应用的JS入口APPRegistry来启动应�
 6 JS层找到已经注册的对应的启动组件，执行renderApplication()来渲染整个应用。
 ```
 
-<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/next_java.png"/>
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/next_java.png"/>
 
 好，我们先从ReactActivity入手。
 
@@ -319,7 +319,7 @@ ReactActivity继承于Activity，并实现了它的生命周期方法。ReactAct
 
 如下所示：
 
-<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/4/ClusterCallButterfly-react-ReactActivity.png"/>
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/4/ClusterCallButterfly-react-ReactActivity.png"/>
 
 所以我们主要来关注ReactActivityDelegate的实现。我们先来看看ReactActivityDelegate的onCreate()方法。
 
@@ -884,7 +884,7 @@ public class CatalystInstanceImpl {
 
 CatalystInstanceImpl.java最终还是调用C++层的CatalystInstanceImpl.cpp去加载JS Bundle，我们去C++层看一下实现。
 
-<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/next_c++.png"/>
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/next_c++.png"/>
 
 可以看出该方法最终调用Native方法jniLoadScriptFromAssets去加载JS Bundle，该方法的实现如下所示：
 
@@ -1143,7 +1143,7 @@ ReactContextInitAsyncTask的后台任务执行完成，进入到异步任务的o
 
 JS Bundle加载并解析完成后，ReactContextInitAsyncTask的后台任务完成，进入onPostExecute()方法，我们继续跟进它的实现。
 
-<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/next_java.png"/>
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/next_java.png"/>
 
 当ReactContext被创建以后，变回继续执行ReactContextInitAsyncTask.onPostExecute()方法。
 
@@ -1258,7 +1258,7 @@ public class ReactInstanceManager {
 
 ```
 
-<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/next_js.png"/>
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/next_js.png"/>
 
 ReactInstanceManager.attachMeasuredRootViewToInstance()最终进入了RN应用的启动流程入口，调用catalystInstance.getJSModule(AppRegistry.class).runApplication(jsAppModuleName, appParams)，
 AppRegistry.class是JS层暴露给Java层的接口方法。它的真正实现在AppRegistry.js里，AppRegistry.js是运行所有RN应用的JS层入口，我们来看看它的实现：

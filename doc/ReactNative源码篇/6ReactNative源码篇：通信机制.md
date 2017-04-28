@@ -16,16 +16,16 @@
 star文章, 关注文章的最新的动态。另外建议大家去Github上浏览文章，一方面文章的写作都是在Github上进行的，所以Github上的更新是最及时
 的，另一方面感觉Github对Markdown的支持更好，文章的渲染也更加美观。
 
-文章目录：https://github.com/guoxiaoxing/react-native-android-container/blob/master/README.md
+文章目录：https://github.com/guoxiaoxing/react-native/blob/master/README.md
 
 >本篇系列文章主要分析ReactNative源码，分析ReactNative的启动流程、渲染原理、通信机制与线程模型等方面内容。
 
-- [1ReactNative源码篇：源码初识](https://github.com/guoxiaoxing/react-native-android-container/blob/master/doc/ReactNative源码篇/1ReactNative源码篇：源码初识.md)
-- [2ReactNative源码篇：代码调用](https://github.com/guoxiaoxing/react-native-android-container/blob/master/doc/ReactNative源码篇/2ReactNative源码篇：代码调用.md)
-- [3ReactNative源码篇：启动流程](https://github.com/guoxiaoxing/react-native-android-container/blob/master/doc/ReactNative源码篇/3ReactNative源码篇：启动流程.md)
-- [4ReactNative源码篇：渲染原理](https://github.com/guoxiaoxing/react-native-android-container/blob/master/doc/ReactNative源码篇/4ReactNative源码篇：渲染原理.md)
-- [5ReactNative源码篇：线程模型](https://github.com/guoxiaoxing/react-native-android-container/blob/master/doc/ReactNative源码篇/5ReactNative源码篇：线程模型.md)
-- [6ReactNative源码篇：通信机制](https://github.com/guoxiaoxing/react-native-android-container/blob/master/doc/ReactNative源码篇/6ReactNative源码篇：通信机制.md)
+- [1ReactNative源码篇：源码初识](https://github.com/guoxiaoxing/react-native/blob/master/doc/ReactNative源码篇/1ReactNative源码篇：源码初识.md)
+- [2ReactNative源码篇：代码调用](https://github.com/guoxiaoxing/react-native/blob/master/doc/ReactNative源码篇/2ReactNative源码篇：代码调用.md)
+- [3ReactNative源码篇：启动流程](https://github.com/guoxiaoxing/react-native/blob/master/doc/ReactNative源码篇/3ReactNative源码篇：启动流程.md)
+- [4ReactNative源码篇：渲染原理](https://github.com/guoxiaoxing/react-native/blob/master/doc/ReactNative源码篇/4ReactNative源码篇：渲染原理.md)
+- [5ReactNative源码篇：线程模型](https://github.com/guoxiaoxing/react-native/blob/master/doc/ReactNative源码篇/5ReactNative源码篇：线程模型.md)
+- [6ReactNative源码篇：通信机制](https://github.com/guoxiaoxing/react-native/blob/master/doc/ReactNative源码篇/6ReactNative源码篇：通信机制.md)
         						
 >通信，指的是RN中Java与JS的通信，即JS中的JSX代码如何转化成Java层真实的View与事件的，以及JavaFile层又是如何调用JS来找出它需要的View与
 事件的。
@@ -221,7 +221,7 @@ ModuleRegistry来进行调用。
 
 RN应用通信桥结构图如下所示：
 
-<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/6/react_native_communication_bridge.png"/>
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/6/react_native_communication_bridge.png"/>
 
 ### 2.1 关于通信桥在Java层中的实现
 
@@ -327,7 +327,7 @@ void Instance::initializeBridge(
 Executor.h文件中定义了抽象类ExecutorDelegate，定义了执行Native Module的方法，它是JS调用Java的桥梁，JsToNativeBridge实现了该类的纯虚函数（抽象方法），该抽象
 类还持有JSExecutor（用来执行JS）的引用。
 
-<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/6/UMLClassDiagram-ExecutorDelegate.png"/>
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/6/UMLClassDiagram-ExecutorDelegate.png"/>
 
 ```c==
 class ExecutorDelegate {
@@ -351,7 +351,7 @@ Executor.h文件中定义了抽象类JSExecutor，它定义了执行JS Module的
 NativeToBridge与JsToNativeBridge相对应，它是Java调用JS的桥梁，NativeToBridge持有JSCExecutor的引用，如果NativeToBridge需要执行JS时就会
 去调用JSCExecutor。
 
-<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/6/UMLClassDiagram-JSExecutor.png"/>
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/6/UMLClassDiagram-JSExecutor.png"/>
 
 ```c++
 
@@ -545,7 +545,7 @@ type ModuleConfig = [
 
 RN应用通信机制流程图（JS->Java）如下所示：
 
-<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/6/react_native_communication_mechanism_js_to_java_flow.png"/>
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/6/react_native_communication_mechanism_js_to_java_flow.png"/>
 
 **举例**
 
@@ -1145,7 +1145,7 @@ class NativeModule {
 ```
 NativeModule有2个子类，它的类图如下所示：
 
-<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/6/UMLClassDiagram-NativeModule.png"/>
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/6/UMLClassDiagram-NativeModule.png"/>
 
 ```c++
 class JavaNativeModule : public NativeModule {
@@ -1190,7 +1190,7 @@ JavaModuleWrapper对应C++层的NativeModule，该类针对Java BaseJavaModule�
 
 RN应用通信机制流程图（Java->JS）如下所示：
 
-<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/6/react_native_communication_mechanism_java_to_js_flow.png"/>
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/6/react_native_communication_mechanism_java_to_js_flow.png"/>
 
 **举例**
 
@@ -1292,7 +1292,7 @@ Java层代码调用JS层代码，需要将JavaScriptModule注册到JavaScriptMod
 
 CatalystInstanceImpl.getJSModule()调用JavaScriptModuleRegistry.getJavaScriptModule()去查询JavaScriptModule。
 
-<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/next_java.png"/>
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/next_java.png"/>
 
 ### 4.1 JavaScriptModuleRegistry.getJavaScriptModule(CatalystInstance instance, ExecutorToken executorToken, Class<T> moduleInterface)
 
@@ -1434,7 +1434,7 @@ public class CatalystInstanceImpl{
 
 方法走到这里，实现逻辑已经由Java层转到C++层，我们去C++层看看具体的实现。
 
-<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/next_c++.png"/>
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/next_c++.png"/>
 
 CatalystInstanceImpl.java在C++层有个对应的类CatalystInstanceImpl.cpp。
 
@@ -1568,7 +1568,7 @@ void JSCExecutor::bindBridge() throw(JSException) {
 }
 ```
 
-<img src="https://github.com/guoxiaoxing/react-native-android-container/raw/master/art/source/next_js.png"/>
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/next_js.png"/>
 
 ### 4.7 MessageQueue.callFunctionReturnFlushedQueue(module: string, method: string, args: Array<any>)
 
