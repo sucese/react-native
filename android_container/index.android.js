@@ -17,7 +17,7 @@ import {
 
 export default class android_container extends Component {
 
-    onPressJavaCallJavascript() {
+    onClickView() {
 
     }
 
@@ -25,76 +25,12 @@ export default class android_container extends Component {
 
     }
 
-    onRefresh(){
+    onRefresh() {
 
     }
 
     render() {
-        return (
-            <View style={styles.container}
-            ani>
-                <ScrollView
-                    style={styles.scrollview}
-                    refreshControl={
-                        <RefreshControl
-                            onRefresh={this.onRefresh()}
-                            refreshing={false}
-                            title='正在加载中...'
-                            tintColor='#FF0000'
-                            colors={['#FF0000', '#00FF00', '#0000FF']}
-                            progressBackgroundColor="#FFFF00"/>
-                    }>
 
-                    <View style={styles.button}>
-                        <Button
-                            title='Java Call Javascript'
-                            onPress={this.onPressJavaCallJavascript}/>
-                    </View>
-
-                    <View style={styles.button}>
-                        <Button
-                            title='Image'
-                            onPress={this.onPressButton}/>
-                    </View>
-
-                    <View style={styles.button}>
-                        <Button
-                            title='View'
-                            onPress={this.onPressButton}/>
-                    </View>
-
-                    <View style={styles.button}>
-                        <Button
-                            title='View'
-                            onPress={this.onPressButton}/>
-                    </View>
-
-                    <View style={styles.button}>
-                        <Button
-                            title='View'
-                            onPress={this.onPressButton}/>
-                    </View>
-
-                    <View style={styles.button}>
-                        <Button
-                            title='View'
-                            onPress={this.onPressButton}/>
-                    </View>
-
-                    <View style={styles.button}>
-                        <Button
-                            title='View'
-                            onPress={this.onPressButton}/>
-                    </View>
-
-                    <View style={styles.button}>
-                        <Button
-                            title='View'
-                            onPress={this.onPressButton}/>
-                    </View>
-                </ScrollView>
-            </View>
-        );
     }
 }
 
