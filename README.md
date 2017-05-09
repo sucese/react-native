@@ -65,7 +65,9 @@
 
 ## 附录
 
-文章最后推荐一些关于React Native的资料。
+### React Native优秀资料
+
+推荐一些关于React Native的比较高质量资料。
 
 https://github.com/jondot/awesome-react-native
 
@@ -76,3 +78,27 @@ fangwei716/30-days-of-react-native：https://github.com/fangwei716/30-days-of-re
 fbsamples/f8app：https://github.com/fbsamples/f8app
 
 构建 F8 App / React Native 开发指南：https://f8-app.liaohuqiu.net/
+
+## React Native实现原理分享
+
+前段时间在公司分享会上做了关于React Native实现原理的分享，以下是分享会的PPT。
+
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/ppt/幻灯片01.png"/>
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/ppt/幻灯片02.png"/>
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/ppt/幻灯片03.png"/>
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/ppt/幻灯片04.png"/>
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/ppt/幻灯片05.png"/>
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/ppt/幻灯片06.png"/>
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/ppt/幻灯片07.png"/>
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/ppt/幻灯片08.png"/>
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/ppt/幻灯片09.png"/>
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/ppt/幻灯片10.png"/>
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/ppt/幻灯片11.png"/>
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/ppt/幻灯片12.png"/>
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/ppt/幻灯片13.png"/>
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/ppt/幻灯片14.png"/>
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/ppt/幻灯片15.png"/>
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/ppt/幻灯片16.png"/>
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/ppt/幻灯片17.png"/>
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/ppt/幻灯片18.png"/>
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/ppt/幻灯片19.png"/>
