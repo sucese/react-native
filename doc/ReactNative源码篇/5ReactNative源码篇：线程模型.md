@@ -35,7 +35,7 @@ Native线程：负责执行C++代码，该线程主要负责Java与C++的通信�
 JS线程：负责解释执行JS。
 ```
 
-## 核心概念
+在正式介绍RN线程模型之前，我们先来了解以下关于线程模型的核心概念。
 
 MessageQueueThread
 
@@ -75,12 +75,11 @@ ReactQueueConfigurationImpl：ReactQueueConfiguration的实现类。
 ```
 
 
-## 创建流程
-
+## 线程的创建与传递流程流程
 
 ReactInstanceManager在创建ReactContext的同时，创建了这3个线程，我们看下代码实现：
 
-#### 5 ReactInstanceManager.createReactContext( JavaScriptExecutor jsExecutor, JSBundleLoader jsBundleLoader)
+#### 1 ReactInstanceManager.createReactContext( JavaScriptExecutor jsExecutor, JSBundleLoader jsBundleLoader)
 
 ```java
 public class ReactInstanceManager {
@@ -119,6 +118,7 @@ public class ReactInstanceManager {
 可以看到传入CatalystInstanceImpl的ReactQueueConfigurationSpec是由ReactQueueConfigurationSpec.createDefault()来创建的，我们来看一下它的实现。
 创建流程。
 
+#### 2 ReactQueueConfigurationSpec.createDefault()
 
 ```java
 public class ReactQueueConfigurationSpec {
@@ -137,6 +137,7 @@ public class ReactQueueConfigurationSpec {
 ```
 在该方法中，创建出的ReactQueueConfigurationSpec告诉后续流程需要创建Native线程与JS线程，我们进一步来看看ReactQueueConfigurationImpl.create()的实现。
 
+#### 3 ReactQueueConfigurationImpl.create()
 
 ```java
 public class CatalystInstanceImpl {
@@ -177,6 +178,8 @@ public class CatalystInstanceImpl {
 ```
 
 可以看出，该方法生成UI线程、Native线程与JS线程各自的MessageQueueThreadImpl，创建各自对应的线程，并设置相应的ExceptionHandler，我们来看一看线程是如何被创建的。
+
+#### 4 MessageQueueThreadImpl.create(MessageQueueThreadSpec spec, QueueThreadExceptionHandler exceptionHandler)
 
 ```java
 public class MessageQueueThreadImpl implements MessageQueueThread {
@@ -317,6 +320,8 @@ Handler：与Looper相关联，处理Looper发送过来的消息，可以看到H
 循环的能力。
 ···
 
+#### 5 CatalystInstanceImpl::initializeBridge()
+
 在[3ReactNative源码篇：启动流程](https://github.com/guoxiaoxing/awesome-react-native/blob/master/doc/ReactNative源码篇/3ReactNative源码篇：启动流程.md)文章中
 我们知道，在CatalystInstanceImpl.java里会调用initializeBridge()将新创建的JS线程与Native线程传入到C++层。
 
@@ -347,8 +352,9 @@ public class CatalystInstanceImpl(
 CatalystInstanceImpl.initializeBridge()传递JS线程与Native线程的调用链为：CatalystInstanceImpl.java的initializeBridge()方法 -> CatalystInstanceImpl.cpp的
 initializeBridge()方法 -> Instance.cpp的initializeBridge()方法，该方法的实现如下所示：
 
+#### 6 Instance::initializeBridge(std::unique_ptr<InstanceCallback> callback, std::shared_ptr<JSExecutorFactory> jsef, std::shared_ptr<MessageQueueThread> jsQueue, std::unique_ptr<MessageQueueThread> nativeQueue, std::shared_ptr<ModuleRegistry> moduleRegistry)
 
-```
+```c++
 void Instance::initializeBridge(
     std::unique_ptr<InstanceCallback> callback,
     std::shared_ptr<JSExecutorFactory> jsef,
@@ -381,3 +387,5 @@ void Instance::initializeBridge(
   CHECK(nativeToJsBridge_);
 }
 ···
+
+JS线程jsQueue传递给JSCExecutor.cpp用来执行JS文件，Native线程传递给NativeToJsBridge.cpp，用来创建通信桥，负责Java与JS的通信。
