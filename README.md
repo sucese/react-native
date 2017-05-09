@@ -69,17 +69,13 @@
 
 推荐一些关于React Native的比较高质量资料。
 
-https://github.com/jondot/awesome-react-native
+- [Awesome React Native](https://github.com/jondot/awesome-react-native)：Awesome React Native components, news, tools, and learning material!
+- [react-native-guide](https://github.com/reactnativecn/react-native-guide)：React Native指南汇集了各类react-native学习资源、开源App和组件
+- [fangwei716/30-days-of-react-native](https://github.com/fangwei716/30-days-of-react-native)
+- [fbsamples/f8app](https://github.com/fbsamples/f8app)
+- [构建 F8 App / React Native 开发指南](https://f8-app.liaohuqiu.net/)
 
-https://github.com/reactnativecn/react-native-guide
-
-fangwei716/30-days-of-react-native：https://github.com/fangwei716/30-days-of-react-native
-
-fbsamples/f8app：https://github.com/fbsamples/f8app
-
-构建 F8 App / React Native 开发指南：https://f8-app.liaohuqiu.net/
-
-## React Native实现原理分享
+### React Native实现原理分享
 
 前段时间在公司分享会上做了关于React Native实现原理的分享，以下是分享会的PPT。
 
