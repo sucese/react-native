@@ -67,7 +67,7 @@ const styles = StyleSheet.create({
 AppRegistry.registerComponent('android_container', () => android_container);
 ```
 
-我们接触到的RN代码通常都是JSX代码，JSX其实是一种语法糖，实际运行的时候，它还是会转换为真正的js代码，为了方便我们理解原理，我们先把上述
+我们接触到的React Native代码通常都是JSX代码，JSX其实是一种语法糖，实际运行的时候，它还是会转换为真正的js代码，为了方便我们理解原理，我们先把上述
 代码转换为js代码。
 
 注：转换可以通过[babel](https://babeljs.io/repl/).
@@ -163,9 +163,17 @@ _reactNative.AppRegistry.registerComponent('android_container', function () {
 
 我们可以看到原来的JSX组件都会被转换为ReactElement组件，该组件定义在ReactElement.js文件中，用来描述js上的ui组件，它里面存放了props等信息。
 
-RN渲染序列图如下所示：
+React Native渲染序列图如下所示：
 
 <img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/render_sequence.png"/>
+
+我们先来简单概括一下整个渲染流程：
+
+1. React Native将代码由JSX转化为JS组件，启动过程中利用instantiateReactComponent将ReactElement转化为复合组件ReactCompositeComponent与元组件ReactNativeBaseComponent，利用
+ReactReconciler对他们进行渲染。
+2. UIManager.js利用C++层的Instance.cpp将UI信息传递给UIManagerModule.java，并利用UIManagerModule.java构建UI。
+3. UIManagerModule.java接收到UI信息后，将UI的操作封装成对应的Action，放在队列中等待执行。各种UI的操作，例如创建、销毁、更新等便在队列里完成，UI最终
+得以渲染在屏幕上。
 
 如上图所示AppRegistry.registerComponent用来注册组件，在该方法内它会调用AppRegistry.runApplication()来启动js的渲染流程。AppRegistry.runApplication()
 会将传入的Component转换成ReactElement，并在外面包裹一层AppContaniner，AppContaniner主要用来提供一些debug工具（例如：红盒）。
@@ -270,8 +278,8 @@ function renderApplication<Props: Object>(
 
 在分析这个函数之前，我们先来补充一下React组件相关知识。React组件可以分为两种：
 
-- 元组件：框架内置的，可以直接使用的组件。例如：View、Image等。它在RN中用ReactNativeBaseComponent来描述。
-- 复合组件：用户封装的组件，一般可以通过React.createClass()来构建，提供render()方法来返回渲染目标。它在RN中用ReactCompositeComponent来描述。
+- 元组件：框架内置的，可以直接使用的组件。例如：View、Image等。它在React Native中用ReactNativeBaseComponent来描述。
+- 复合组件：用户封装的组件，一般可以通过React.createClass()来构建，提供render()方法来返回渲染目标。它在React Native中用ReactCompositeComponent来描述。
 
 instantiateReactComponent(node, shouldHaveDebugID)方法根据对象的type生成元组件或者复合组件。
 
@@ -477,9 +485,14 @@ public abstract class ViewManager<T extends View, C extends ReactShadowNode>
      }
 }
 ```
+ViewManager.createView()方法调用相应组件的构造函数构建View实例，并设置事件发射器，当前View发生的事件会通过发射器发送到JS层处理。
 
-以上便是RN渲染的整个流程，我们再来总结一下。
 
-RN将代码由JSX转化为JS组件，启动过程中利用instantiateReactComponent将ReactElement转化为复合组件ReactCompositeComponent与元组件ReactNativeBaseComponent，利用
+以上便是React Native渲染的整个流程，我们再来总结一下。
+
+1. React Native将代码由JSX转化为JS组件，启动过程中利用instantiateReactComponent将ReactElement转化为复合组件ReactCompositeComponent与元组件ReactNativeBaseComponent，利用
 ReactReconciler对他们进行渲染。
+2. UIManager.js利用C++层的Instance.cpp将UI信息传递给UIManagerModule.java，并利用UIManagerModule.java构建UI。
+3. UIManagerModule.java接收到UI信息后，将UI的操作封装成对应的Action，放在队列中等待执行。各种UI的操作，例如创建、销毁、更新等便在队列里完成，UI最终
+得以渲染在屏幕上。
 
