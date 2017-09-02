@@ -165,7 +165,7 @@ _reactNative.AppRegistry.registerComponent('android_container', function () {
 
 React Native渲染序列图如下所示：
 
-<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/render_sequence.png"/>
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/4/render_sequence.png"/>
 
 我们先来简单概括一下整个渲染流程：
 
