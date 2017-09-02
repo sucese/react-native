@@ -204,7 +204,7 @@ function renderApplication<Props: Object>(
 
 我们抛开函数调用链，分析其中关键的部分，其他部分都是简单的函数调用。
 
-## 关键点1：ReactNativeMount.renderComponent()
+### 关键点1：ReactNativeMount.renderComponent()
 
 ```javascript
   /**
@@ -274,7 +274,7 @@ function renderApplication<Props: Object>(
 3. 将mount任务提交给回调Queue，最终会调用ReactReconciler.mountComponent()，ReactReconciler.mountComponent()又会去调用C++层Instance::mountComponent()
 方法。
 
-## 关键点2：instantiateReactComponent.instantiateReactComponent(node, shouldHaveDebugID)
+### 关键点2：instantiateReactComponent.instantiateReactComponent(node, shouldHaveDebugID)
 
 在分析这个函数之前，我们先来补充一下React组件相关知识。React组件可以分为两种：
 
@@ -382,7 +382,7 @@ function instantiateReactComponent(node, shouldHaveDebugID) {
 
 我们可以看到，UI渲染主要通过UIManager来完成，UIManager是一个ReactModule，UIManager.js里的操作都会对应到UIManagerModule里来。
 
-## 关键点3：UIManagerModule.createView
+### 关键点3：UIManagerModule.createView
 
 在UIManagerModule这个类里被@ReactMethod注解标记的都是可以被js调用的方法。UIManagerModule把功能委托给了UIImplementation来实现。
 
@@ -426,7 +426,7 @@ public class UIImplementation {
 ReactShadowNode用来描述DOM树的节点，它将js层传递过来的UI信息包装成一个ReactShadowNode，调用handleCreateView()方法把UI的操作封装成一个
 Action，放进队列中等到执行。
 
-## 关键点4：NativeViewHierarchyManager.createView()
+### 关键点4：NativeViewHierarchyManager.createView()
 
 从上面的序列可以看出，所有的View操作都会被被包装成一个Action，然后放在队列中等待处理。
 
