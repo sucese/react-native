@@ -28,7 +28,7 @@
 ```
 好，我们先来看第一个问题。
 
-## ReactNative系统框架概述
+## 一 ReactNative系统框架概述
 
 ReactNative源码结构图
 
@@ -54,7 +54,7 @@ ReactNative系统框架图如下所示：
 
 >注：JSCore，即JavaScriptCore，JS解析的核心部分，IOS使用的是内置的JavaScriptCore，Androis上使用的是https://webkit.org/家的jsc.so。
 
-## ReactNative系统框架主线与支线
+## 二 ReactNative源码的主线与支线
 
 从上面对ReactNative系统框架的分析，我们很容易看出源码的主线就在于ReactNative的启动流程、UI的绘制与渲染以及双边通信（Java调用JS，JS调用Java）。
 
@@ -75,76 +75,69 @@ ReactNative系统框架图如下所示：
 3 ReactNative触摸事件处理机制
 ```
 
-在正式开始分析源码之前，我们先简单介绍一下各个类的作用，让大家先有个大概的印象，方便以后的讲解。
+上面便是整个源码的主线与支线，了解了大致的流程。我们再来理解一些重要的概念，方便后续的源码展开分析。
 
-ReactContext(Java层)
+## 三 ReactNative源码的重要概念
 
-```
-继承于ContextWrapper，是RN应用的上下文，通过getContext()去获得，通过它可以访问RN核心类的实现。
-```
-ReactInstanceManagerImpl/ReactInstanceManagerImpl(Java层)
+### 3.1 ReactContext
 
-```
-RN应用总的管理类，创建ReactContext、CatalystInstance等类，解析ReactPackage生成映射表，并且配合ReactRootView管理View的创建与生命周期等功能。
-```
+>ReactContext继承于ContextWrapper，是ReactNative应用的上下文，通过getContext()去获得，通过它可以访问ReactNative核心类的实现。
 
-CatalystInstance/CatalystInstanceImpl(Java层/C++层)
+整个启动流程重要创建实例之一就是ReactContext，在正式介绍启动流程之前，我们先来了接一下ReactContext的概念。
 
-```
-RN应用Java层、C++层、JS层通信总管理类，总管Java层、JS层核心Module映射表与回调，三端通信的入口与桥梁。
-```
+>ReactContext继承于ContextWrapper，也就是说它和Android中的Context是一个概念，是整个应用的上下文。那么什么是上下文呢，我们知道Android的应用模型是基于组件的应用设计模式，
+组件的运行需要完整的运行环境，这种运行环境便是应用的上下文。
 
-NativeToJsBridge(C++层)
+上面的概念可能有点抽象，我们举个例子说明一下。
 
-```
-Java调用JS的桥梁，用来调用JS Module，回调Java。
-```
+用户与操作系统的每一次交互都是一个场景，例如：打电话、发短信等有节目的场景（Activity），后台播放音乐等没有节目的场景（Service），这种交互的场景（Activity、Service等）都被
+抽象成了上下文环境（Context），它代表了当前对象再应用中所处的一个环境、一个与系统交互的过程。
 
-JsToNativeBridge(C++层)
+我们来了解一下ReactContext的具体实现与功能，先来看一下它的类图：
+
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/2/UMLClassDiagram-bridge-ReactContext.png"/>
+
+从上图可以看出，ReactContext继承与ContextWrapper，并有子类：
 
 ```
-JS调用Java的桥梁，用来调用Java Module。
+ReactApplicationContext：继承于ReactContext，ReactContext的wrapper类，就像Context与ContextWrapper的关系一样。
+ThemedReactContext：继承于ReactContext，也是ReactContext的wrapper类。
 ```
 
-JSCExecutor(C++层)
+### 3.2 ReactInstanceManager
 
-```
-管理WebKit的JavaScriptCore，JS与C++的转换桥接都在这里进行中转处理。
-```
-MessageQueue(JS层)
+>ReactInstanceManager是ReactNative应用总的管理类，创建ReactContext、CatalystInstance等类，解析ReactPackage生成映射表，并且配合ReactRootView管理View的创建与生命周期等功能。
 
-```
-JS调用队列，调用Java Module或者JS Module的方法，处理回调。
-```
+### 3.3 CatalystInstance
 
-JavaScriptModule(Java层)
+>CatalystInstance是ReactNative应用Java层、C++层、JS层通信总管理类，总管Java层、JS层核心Module映射表与回调，三端通信的入口与桥梁。
 
-```
-JS Module，负责JS到Java的映射调用格式声明，由CatalystInstance统一管理。
-```
+### 3.4 NativeToJsBridge/JsToNativeBridge
 
-ReactContextBaseJavaModule/BaseJavaModule/NativeModule(Java层)
+>NativeToJsBridge是Java调用JS的桥梁，用来调用JS Module，回调Java。
 
-```
-Java Module，负责Java到Js的映射调用格式声明，由CatalystInstance统一管理。
-```
+>JsToNativeBridge是JS调用Java的桥梁，用来调用Java Module。
 
-JavascriptModuleRegistry(Java层)
+### 3.5 JavaScriptModule/NativeModule
 
-```
-JS Module映射表
-```
-NativeModuleRegistry(Java层)
+>JavaScriptModule是JS Module，负责JS到Java的映射调用格式声明，由CatalystInstance统一管理。
 
-```
-Java Module映射表
-```
+>NativeModule是ava Module，负责Java到Js的映射调用格式声明，由CatalystInstance统一管理。
 
+
+JavaScriptModule：JS暴露给Java调用的API集合，例如：AppRegistry、DeviceEventEmitter等。业务放可以通过继承JavaScriptModule接口类似自定义接口模块，声明
+与JS相对应的方法即可。
+
+NativeModule/UIManagerModule：NativeModule是Java暴露给JS调用的APU集合，例如：ToastModule、DialogModule等，UIManagerModule也是供JS调用的API集
+合，它用来创建View。业务放可以通过实现NativeModule来自定义模块，通过getName()将模块名暴露给JS层，通过@ReactMethod注解将API暴露给JS层。
+
+### 3.6 JavascriptModuleRegistry
+
+>JavascriptModuleRegistry是JS Module映射表，NativeModuleRegistry是Java Module映射表
 
 ## 附录
 
 为了方便大家理解，准备了导读PPT。
-
 
 <img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/ppt/幻灯片01.png"/>
 <img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/ppt/幻灯片02.png"/>

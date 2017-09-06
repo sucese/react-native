@@ -4,7 +4,15 @@
 
 >郭孝星，非著名程序员，主要从事Android平台基础架构与中间件方面的工作，欢迎交流技术方面的问题，可以去我的[Github](https://github.com/guoxiaoxing)提交Issue或者发邮件至guoxiaoxingse@163.com与我联系。
 
-文章目录：https://github.com/guoxiaoxing/react-native/blob/master/README.md
+**文章目录**
+
+- 一 执行器的实现
+    - 1.1 Native代码执行器
+    - 1.2 JS代码执行器
+- 二 Java与C++的交互
+- 三 JavaScript与C++的交互
+
+更多文章：https://github.com/guoxiaoxing/react-native/blob/master/README.md
 
 >本篇系列文章主要分析ReactNative源码，分析ReactNative的启动流程、渲染原理、通信机制与线程模型等方面内容。
 
@@ -15,7 +23,108 @@
 - [5ReactNative源码篇：线程模型](https://github.com/guoxiaoxing/react-native/blob/master/doc/ReactNative源码篇/5ReactNative源码篇：线程模型.md)
 - [6ReactNative源码篇：通信机制](https://github.com/guoxiaoxing/react-native/blob/master/doc/ReactNative源码篇/6ReactNative源码篇：通信机制.md)
 		
-## Java与C++的交互
+## 一 执行器的实现
+
+在C++层的Executor.h文件中同一定义了执行Native代码的抽象类ExecutorDelegate，以及执行JS代码的抽象类JSExecutor。
+
+### 1.1 Native代码执行器
+
+ExecutorDelegate：在Executor.h中定义，由JsToNativeBridge实现，该抽象类用于JS代码调用Native代码，该类的类图如下所示：
+
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/6/UMLClassDiagram-ExecutorDelegate.png"/>
+
+```c++
+
+// This interface describes the delegate interface required by
+// Executor implementations to call from JS into native code.
+class ExecutorDelegate {
+ public:
+  virtual ~ExecutorDelegate() {}
+
+  //注册JS执行器
+  virtual void registerExecutor(std::unique_ptr<JSExecutor> executor,
+                                std::shared_ptr<MessageQueueThread> queue) = 0;
+  //注销JS执行器
+  virtual std::unique_ptr<JSExecutor> unregisterExecutor(JSExecutor& executor) = 0;
+
+  //获取模块注册表
+  virtual std::shared_ptr<ModuleRegistry> getModuleRegistry() = 0;
+
+  //调用Native Module，在它实现中，它会进一步调用ModuleRegistry::callNativeMethod() -> NativeModule::invoke()，进而
+  //完成对Native Module的调用。
+  virtual void callNativeModules(
+    JSExecutor& executor, folly::dynamic&& calls, bool isEndOfBatch) = 0;
+  virtual MethodCallResult callSerializableNativeHook(
+    JSExecutor& executor, unsigned int moduleId, unsigned int methodId, folly::dynamic&& args) = 0;
+};
+```
+
+### 1.2 JS代码执行器
+
+JS的解析是在Webkit-JavaScriptCore中完成的，JSCExexutor.cpp对JavaScriptCore的功能做了进一步的封装，我们来看一下它的实现。
+
+JSExecutor：在Executor.h中定义，正如它的名字那样，它是用来执行JS代码的。执行代码的命令是通过JS层的BatchedBridge传递过来的。
+
+
+我们先来看一下JSExecutor的类图，可以看到
+
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/3/UMLClassDiagram-JSExecutor.png"/>
+
+```c++
+class JSExecutor {
+public:
+  /**
+   * Execute an application script bundle in the JS context.
+   */
+  virtual void loadApplicationScript(std::unique_ptr<const JSBigString> script,
+                                     std::string sourceURL) = 0;
+
+  /**
+   * Add an application "unbundle" file
+   */
+  virtual void setJSModulesUnbundle(std::unique_ptr<JSModulesUnbundle> bundle) = 0;
+
+  /**
+   * Executes BatchedBridge.callFunctionReturnFlushedQueue with the module ID,
+   * method ID and optional additional arguments in JS. The executor is responsible
+   * for using Bridge->callNativeModules to invoke any necessary native modules methods.
+   */
+  virtual void callFunction(const std::string& moduleId, const std::string& methodId, const folly::dynamic& arguments) = 0;
+
+  /**
+   * Executes BatchedBridge.invokeCallbackAndReturnFlushedQueue with the cbID,
+   * and optional additional arguments in JS and returns the next queue. The executor
+   * is responsible for using Bridge->callNativeModules to invoke any necessary
+   * native modules methods.
+   */
+  virtual void invokeCallback(const double callbackId, const folly::dynamic& arguments) = 0;
+
+  virtual void setGlobalVariable(std::string propName,
+                                 std::unique_ptr<const JSBigString> jsonValue) = 0;
+  virtual void* getJavaScriptContext() {
+    return nullptr;
+  }
+  virtual bool supportsProfiling() {
+    return false;
+  }
+  virtual void startProfiler(const std::string &titleString) {}
+  virtual void stopProfiler(const std::string &titleString, const std::string &filename) {}
+  virtual void handleMemoryPressureUiHidden() {}
+  virtual void handleMemoryPressureModerate() {}
+  virtual void handleMemoryPressureCritical() {
+    handleMemoryPressureModerate();
+  }
+  virtual void destroy() {}
+  virtual ~JSExecutor() {}
+};
+```
+
+可以看到除了JSExecutor.cpp实现了抽象类JSExecutor里的方法，ProxyExecutor.cpp也实现了它里面的方法，这是RN给了我们自定义JS解析器的能力，可以在CatalystInstance.Builder里
+setJSExecutor()，具体可以参见JavaJSExecutor与ProxyJavaScriptExecutor，它们的类图如下所示：
+
+<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/3/UMLClassDiagram-cxxbridge-ProxyJavaScriptExecutor.png"/>
+
+## 二 Java与C++的交互
 
 我们都知道如果需要用Java调用C/C++，需要用到Java中的JNI，但是用过JNI的同学都知道这是个繁琐且低效的调用方式，在大型工程体现的更加明显，因为我们需要将Java与C/C++的
 相互访问与通信框架化，形成更高层次的封装，避免直接使用原始的JNI反射API去做调用。
@@ -167,7 +276,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
 } 
 ```
 
-## JavaScript与C++的交互
+## 三 JavaScript与C++的交互
 
 RN解析JS用的是Webkit的脚本引擎JavaScriptCore，JavaScriptCore负责JS的解释与执行。
 
@@ -199,7 +308,7 @@ JSValueToBooleanJSValueToNumber JSValueToStringCopy：JSValueRef转为C++类型
 JSValueMakeBooleanJSValueMakeNumber JSValueMakeString：C++类型转为JSValueRef
 ```
 
-### C++调用JavaScript
+### 3.1 C++调用JavaScript
 
 1 获取Global全局对象
 
@@ -242,7 +351,7 @@ JSValueRef objFunc = JSObjectGetProperty(ctx, object, funcObjName,NULL); JSStrin
 JSObjectCallAsFunction(ctx, objFunc, NULL, 0, 0, NULL);
 
 ```
-### JavaScript调用C++
+### 3.2 JavaScript调用C++
 
 JavaScript想要调用C++，就必须先要将C++里的变量、函数与类注入到JavaScript中。
 

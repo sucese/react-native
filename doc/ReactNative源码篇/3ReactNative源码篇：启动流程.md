@@ -4,8 +4,12 @@
 
 >郭孝星，非著名程序员，主要从事Android平台基础架构与中间件方面的工作，欢迎交流技术方面的问题，可以去我的[Github](https://github.com/guoxiaoxing)提交Issue或者发邮件至guoxiaoxingse@163.com与我联系。
 
+**文章目录**
 
-文章目录：https://github.com/guoxiaoxing/react-native/blob/master/README.md
+- 一 应用的初始化流程
+- 二 应用的启动流程
+    
+更多文章：https://github.com/guoxiaoxing/react-native/blob/master/README.md
 
 >本篇系列文章主要分析ReactNative源码，分析ReactNative的启动流程、渲染原理、通信机制与线程模型等方面内容。
 
@@ -15,8 +19,12 @@
 - [4ReactNative源码篇：渲染原理](https://github.com/guoxiaoxing/react-native/blob/master/doc/ReactNative源码篇/4ReactNative源码篇：渲染原理.md)
 - [5ReactNative源码篇：线程模型](https://github.com/guoxiaoxing/react-native/blob/master/doc/ReactNative源码篇/5ReactNative源码篇：线程模型.md)
 - [6ReactNative源码篇：通信机制](https://github.com/guoxiaoxing/react-native/blob/master/doc/ReactNative源码篇/6ReactNative源码篇：通信机制.md)
-            							
+  						
+## 一 应用初始化流程
+
 在分析具体的启动流程之前，我们先从Demo代码入手，对外部的代码有个大致的印象，我们才能进一步去了解内部的逻辑。
+
+**举例**
 
 1 首先我们会在应用的Application里做RN的初始化操作。
 
@@ -124,156 +132,69 @@ const styles = StyleSheet.create({
 //注册组件名，JS与Java格子各自维护了一个注册表
 AppRegistry.registerComponent('standard_project', () => standard_project);
 ```
-以上便是RN开发的三个步骤，本篇文章我们重点关注RN应用的启动流程，具体说来，有以下几个方面：
 
-```
-1 RN应用的启动的函数调用链，分析流程细节。
-2 RN应用启动过程中创建了哪些组件，这些组件各自都由什么功能。
-```
+可以看到我们在Application里实现了ReactApplication接口，该接口要求创建一个ReactNativeHost对象，该对象持有ReactInstanceManager实例，做一些初始化操作。
 
-在正式分析启动流程之前，我们先来了解和启动流程相关的一些重要概念。
-
-### ReactContext
-
-整个启动流程重要创建实例之一就是ReactContext，在正式介绍启动流程之前，我们先来了接一下ReactContext的概念。
-
->ReactContext继承于ContextWrapper，也就是说它和Android中的Context是一个概念，是整个应用的上下文。那么什么是上下文呢，我们知道Android的应用模型是基于组件的应用设计模式，
-组件的运行需要完整的运行环境，这种运行环境便是应用的上下文。
-
-上面的概念可能有点抽象，我们举个例子说明一下。
-
-用户与操作系统的每一次交互都是一个场景，例如：打电话、发短信等有节目的场景（Activity），后台播放音乐等没有节目的场景（Service），这种交互的场景（Activity、Service等）都被
-抽象成了上下文环境（Context），它代表了当前对象再应用中所处的一个环境、一个与系统交互的过程。
-
-我们来了解一下ReactContext的具体实现与功能，先来看一下它的类图：
-
-<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/2/UMLClassDiagram-bridge-ReactContext.png"/>
-
-从上图可以看出，ReactContext继承与ContextWrapper，并有子类：
-
-```
-ReactApplicationContext：继承于ReactContext，ReactContext的wrapper类，就像Context与ContextWrapper的关系一样。
-ThemedReactContext：继承于ReactContext，也是ReactContext的wrapper类。
-```
-
-### NativeModule/UIManagerModule/JavascriptModule
-
-Module即模块，是暴露给对方调用的API集合。
-
-NativeModule/UIManagerModule
-
-```
-NativeModule/UIManagerModule：NativeModule是Java暴露给JS调用的APU集合，例如：ToastModule、DialogModule等，UIManagerModule也是供JS调用的API集合，它用来创建View。
-业务放可以通过实现NativeModule来自定义模块，通过getName()将模块名暴露给JS层，通过@ReactMethod注解将API暴露给JS层。
-
-JavaScriptModule：JS暴露给Java调用的API集合，例如：AppRegistry、DeviceEventEmitter等。业务放可以通过继承JavaScriptModule接口类似自定义接口模块，声明与JS相对应的方法
-即可。
-```
-
-## 一 执行器的实现
-
-在C++层的Executor.h文件中同一定义了执行Native代码的抽象类ExecutorDelegate，以及执行JS代码的抽象类JSExecutor。
-
-### 1.1 Native代码执行器
-
-ExecutorDelegate：在Executor.h中定义，由JsToNativeBridge实现，该抽象类用于JS代码调用Native代码，该类的类图如下所示：
-
-<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/6/UMLClassDiagram-ExecutorDelegate.png"/>
-
-```c++
-
-// This interface describes the delegate interface required by
-// Executor implementations to call from JS into native code.
-class ExecutorDelegate {
- public:
-  virtual ~ExecutorDelegate() {}
-
-  //注册JS执行器
-  virtual void registerExecutor(std::unique_ptr<JSExecutor> executor,
-                                std::shared_ptr<MessageQueueThread> queue) = 0;
-  //注销JS执行器
-  virtual std::unique_ptr<JSExecutor> unregisterExecutor(JSExecutor& executor) = 0;
-
-  //获取模块注册表
-  virtual std::shared_ptr<ModuleRegistry> getModuleRegistry() = 0;
-
-  //调用Native Module，在它实现中，它会进一步调用ModuleRegistry::callNativeMethod() -> NativeModule::invoke()，进而
-  //完成对Native Module的调用。
-  virtual void callNativeModules(
-    JSExecutor& executor, folly::dynamic&& calls, bool isEndOfBatch) = 0;
-  virtual MethodCallResult callSerializableNativeHook(
-    JSExecutor& executor, unsigned int moduleId, unsigned int methodId, folly::dynamic&& args) = 0;
-};
-```
-
-### 1.2 JS代码执行器
-
-JS的解析是在Webkit-JavaScriptCore中完成的，JSCExexutor.cpp对JavaScriptCore的功能做了进一步的封装，我们来看一下它的实现。
-
-JSExecutor：在Executor.h中定义，正如它的名字那样，它是用来执行JS代码的。执行代码的命令是通过JS层的BatchedBridge传递过来的。
-
-
-我们先来看一下JSExecutor的类图，可以看到
-
-<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/3/UMLClassDiagram-JSExecutor.png"/>
-
-```c++
-class JSExecutor {
-public:
-  /**
-   * Execute an application script bundle in the JS context.
-   */
-  virtual void loadApplicationScript(std::unique_ptr<const JSBigString> script,
-                                     std::string sourceURL) = 0;
+```java
+public interface ReactApplication {
 
   /**
-   * Add an application "unbundle" file
+   * Get the default {@link ReactNativeHost} for this app.
    */
-  virtual void setJSModulesUnbundle(std::unique_ptr<JSModulesUnbundle> bundle) = 0;
+  ReactNativeHost getReactNativeHost();
+}
 
-  /**
-   * Executes BatchedBridge.callFunctionReturnFlushedQueue with the module ID,
-   * method ID and optional additional arguments in JS. The executor is responsible
-   * for using Bridge->callNativeModules to invoke any necessary native modules methods.
-   */
-  virtual void callFunction(const std::string& moduleId, const std::string& methodId, const folly::dynamic& arguments) = 0;
-
-  /**
-   * Executes BatchedBridge.invokeCallbackAndReturnFlushedQueue with the cbID,
-   * and optional additional arguments in JS and returns the next queue. The executor
-   * is responsible for using Bridge->callNativeModules to invoke any necessary
-   * native modules methods.
-   */
-  virtual void invokeCallback(const double callbackId, const folly::dynamic& arguments) = 0;
-
-  virtual void setGlobalVariable(std::string propName,
-                                 std::unique_ptr<const JSBigString> jsonValue) = 0;
-  virtual void* getJavaScriptContext() {
-    return nullptr;
-  }
-  virtual bool supportsProfiling() {
-    return false;
-  }
-  virtual void startProfiler(const std::string &titleString) {}
-  virtual void stopProfiler(const std::string &titleString, const std::string &filename) {}
-  virtual void handleMemoryPressureUiHidden() {}
-  virtual void handleMemoryPressureModerate() {}
-  virtual void handleMemoryPressureCritical() {
-    handleMemoryPressureModerate();
-  }
-  virtual void destroy() {}
-  virtual ~JSExecutor() {}
-};
 ```
 
+在创建ReactNativeHost对象时，重写了里面的介个方法，这些方法提供一些初始化信息，具体说来：
 
-可以看到除了JSExecutor.cpp实现了抽象类JSExecutor里的方法，ProxyExecutor.cpp也实现了它里面的方法，这是RN给了我们自定义JS解析器的能力，可以在CatalystInstance.Builder里
-setJSExecutor()，具体可以参见JavaJSExecutor与ProxyJavaScriptExecutor，它们的类图如下所示：
+```java
 
-<img src="https://github.com/guoxiaoxing/react-native/raw/master/art/source/3/UMLClassDiagram-cxxbridge-ProxyJavaScriptExecutor.png"/>
+//是否开启dev模式，dev模式下会有一些调试工具，例如红盒
+public abstract boolean getUseDeveloperSupport();
 
+//返回app需要的ReactPackage，这些ReactPackage里包含了运行时需要用到的NativeModule
+//JavaScriptModule以及ViewManager
+protected abstract List<ReactPackage> getPackages();
+```
 
-## 二 RN应用的启动流程
+ReactNativeHost主要的工作就是创建了ReactInstanceManager，它将一些信息传递给了ReactInstanceManager。
+
+```java
+public abstract class ReactNativeHost {
+   
+      protected ReactInstanceManager createReactInstanceManager() {
+        ReactInstanceManagerBuilder builder = ReactInstanceManager.builder()
+          //应用上下文
+          .setApplication(mApplication)
+          //JSMainModuleP相当于应用首页的js Bundle，可以传递url从服务器拉取js Bundle
+          //当然这个只在dev模式下可以使用
+          .setJSMainModulePath(getJSMainModuleName())
+          //是否开启dev模式
+          .setUseDeveloperSupport(getUseDeveloperSupport())
+          //红盒的回调
+          .setRedBoxHandler(getRedBoxHandler())
+          //自定义UI实现机制，这个我们一般用不到
+          .setUIImplementationProvider(getUIImplementationProvider())
+          .setInitialLifecycleState(LifecycleState.BEFORE_CREATE);
+    
+        //添加ReactPackage
+        for (ReactPackage reactPackage : getPackages()) {
+          builder.addPackage(reactPackage);
+        }
+    
+        //获取js Bundle的加载路径
+        String jsBundleFile = getJSBundleFile();
+        if (jsBundleFile != null) {
+          builder.setJSBundleFile(jsBundleFile);
+        } else {
+          builder.setBundleAssetName(Assertions.assertNotNull(getBundleAssetName()));
+        }
+        return builder.build();
+      }
+}
+```
+## 二 应用启动流程
 
 >一句话概括启动流程：先是应用终端启动并创建应用上下文，应用上下文启动JS Runtime，进行布局，再由应用终端进行渲染，最后将渲染的View添加到ReactRootView上，最终呈现在用户面前。
 
@@ -408,6 +329,8 @@ public class ReactRootView extends SizeMonitoringFrameLayout implements RootView
 
 }
 ```
+
+这个方法用来创建应用的上下文，RN应用的上下文用ReactContext来描述。
 
 我们来看看这个函数的3个参数：
 
