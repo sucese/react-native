@@ -2,9 +2,9 @@
 
 **关于作者**
 
->郭孝星，非著名程序员，主要从事Android平台基础架构与中间件方面的工作，欢迎交流技术方面的问题，可以去我的[Github](https://github.com/guoxiaoxing)提交Issue或者发邮件至guoxiaoxingse@163.com与我联系。
+>郭孝星，程序员，吉他手，主要从事Android平台基础架构方面的工作，欢迎交流技术方面的问题，可以去我的[Github](https://github.com/guoxiaoxing)提issue或者发邮件至guoxiaoxingse@163.com与我交流。
 
-文章目录：https://github.com/guoxiaoxing/react-native/blob/master/README.md
+更多文章：https://github.com/guoxiaoxing/react-native/blob/master/README.md
 
 >本篇系列文章主要分析ReactNative源码，分析ReactNative的启动流程、渲染原理、通信机制与线程模型等方面内容。
 
@@ -14,6 +14,409 @@
 - [4ReactNative源码篇：渲染原理](https://github.com/guoxiaoxing/react-native/blob/master/doc/ReactNative源码篇/4ReactNative源码篇：渲染原理.md)
 - [5ReactNative源码篇：线程模型](https://github.com/guoxiaoxing/react-native/blob/master/doc/ReactNative源码篇/5ReactNative源码篇：线程模型.md)
 - [6ReactNative源码篇：通信机制](https://github.com/guoxiaoxing/react-native/blob/master/doc/ReactNative源码篇/6ReactNative源码篇：通信机制.md)
+
+
+## 一 JS的加载流程
+
+在讲解渲染流程之前，我们先来看看JS是如何被加载的，JS的加载有很多种方式，可以从本地加载，也可以从服务器加载。
+
+在文章[3ReactNative源码篇：启动流程](https://github.com/guoxiaoxing/react-native/blob/master/doc/ReactNative源码篇/3ReactNative源码篇：启动流程.md)中，我们提到
+在创建上下文的之前会去加载JS
+
+```java
+public class ReactInstanceManager {
+
+ /**
+   * Trigger react context initialization asynchronously in a background async task. This enables
+   * applications to pre-load the application JS, and execute global code before
+   * {@link ReactRootView} is available and measured. This should only be called the first time the
+   * application is set up, which is enforced to keep developers from accidentally creating their
+   * application multiple times without realizing it.
+   *
+   * Called from UI thread.
+   */
+  public void createReactContextInBackground() {
+    Assertions.assertCondition(
+        !mHasStartedCreatingInitialContext,
+        "createReactContextInBackground should only be called when creating the react " +
+            "application for the first time. When reloading JS, e.g. from a new file, explicitly" +
+            "use recreateReactContextInBackground");
+
+    mHasStartedCreatingInitialContext = true;
+    //进一步调用recreateReactContextInBackgroundInner()
+    recreateReactContextInBackgroundInner();
+  }
+
+  /**
+   * Recreate the react application and context. This should be called if configuration has
+   * changed or the developer has requested the app to be reloaded. It should only be called after
+   * an initial call to createReactContextInBackground.
+   *
+   * Called from UI thread.
+   */
+  public void recreateReactContextInBackground() {
+    Assertions.assertCondition(
+        mHasStartedCreatingInitialContext,
+        "recreateReactContextInBackground should only be called after the initial " +
+            "createReactContextInBackground call.");
+    recreateReactContextInBackgroundInner();
+  }
+
+  private void recreateReactContextInBackgroundInner() {
+    UiThreadUtil.assertOnUiThread();
+
+    //开发模式，实现在线更新Bundle，晃动弹出调试菜单等功能，这一部分属于调试功能流程。
+    if (mUseDeveloperSupport && mJSMainModuleName != null) {
+      final DeveloperSettings devSettings = mDevSupportManager.getDevSettings();
+
+      // If remote JS debugging is enabled, load from dev server.
+      //判断是否处于开发模式，如果处于开发模式，则从Dev Server中获取JSBundle，如果不是则从文件中获取。
+      if (mDevSupportManager.hasUpToDateJSBundleInCache() &&
+          !devSettings.isRemoteJSDebugEnabled()) {
+        // If there is a up-to-date bundle downloaded from server,
+        // with remote JS debugging disabled, always use that.
+        onJSBundleLoadedFromServer();
+      } else if (mBundleLoader == null) {
+        mDevSupportManager.handleReloadJS();
+      } 
+      
+      else {
+        mDevSupportManager.isPackagerRunning(
+            new PackagerStatusCallback() {
+              @Override
+              public void onPackagerStatusFetched(final boolean packagerIsRunning) {
+                UiThreadUtil.runOnUiThread(
+                    new Runnable() {
+                      @Override
+                      public void run() {
+                        //打包服务器已经运行，开始加载JS
+                        if (packagerIsRunning) {
+                          mDevSupportManager.handleReloadJS();
+                        } else {
+                          // If dev server is down, disable the remote JS debugging.
+                          devSettings.setRemoteJSDebugEnabled(false);
+                          recreateReactContextInBackgroundFromBundleLoader();
+                        }
+                      }
+                    });
+              }
+            });
+      }
+      return;
+    }
+
+    //线上模式
+    recreateReactContextInBackgroundFromBundleLoader();
+  }
+}
+```
+
+我们重点来看看DevSupportManager.handleReloadJS()方法。
+
+```java
+public class DevSupportManagerImpl implements
+    DevSupportManager,
+    PackagerCommandListener,
+    DevInternalSettings.Listener {
+
+      @Override
+      public void handleReloadJS() {
+        UiThreadUtil.assertOnUiThread();
+    
+        // dismiss redbox if exists
+        if (mRedBoxDialog != null) {
+          mRedBoxDialog.dismiss();
+        }
+    
+        if (mDevSettings.isRemoteJSDebugEnabled()) {
+          mDevLoadingViewController.showForRemoteJSEnabled();
+          mDevLoadingViewVisible = true;
+          reloadJSInProxyMode();
+        } else {
+          String bundleURL =
+            mDevServerHelper.getDevServerBundleURL(Assertions.assertNotNull(mJSAppBundleName));
+          reloadJSFromServer(bundleURL);
+        }
+      }
+}
+```
+
+这里的mJSAppBundleName是在创建ReactNativeHost里创建的，由getJSMainModuleName()方法提供，默认是index.android。
+
+```java
+  protected String getJSMainModuleName() {
+    return "index.android";
+  }
+```
+bundleURL是由mJSAppBundleName、platform、dev等拼接未来，它描述JS Bundle的位置信息以及一些开发信息。
+
+本地Bundle
+
+```
+http://172.17.4.143:8081/index.android.bundle?platform=android&dev=true&hot=false&minify=false
+```
+
+DevSupportManagerImpl.handleReloadJS()调用reloadJSFromServer(bundleURL)来加载Bundle，reloadJSFromServer(bundleURL)
+又调用BundleDownloader.()方法来加载Bundle，我们来看看这个方法的实现。
+
+### 1.1 关键点1：BundleDownloader.downloadBundleFromURL(final DevBundleDownloadListener callback, final File outputFile, final String bundleURL) 
+
+```java
+public class BundleDownloader {
+
+     public void downloadBundleFromURL(
+          final DevBundleDownloadListener callback,
+          final File outputFile,
+          final String bundleURL) {
+        final Request request = new Request.Builder()
+            .url(bundleURL)
+            // FIXME: there is a bug that makes MultipartStreamReader to never find the end of the
+            // multipart message. This temporarily disables the multipart mode to work around it, but
+            // it means there is no progress bar displayed in the React Native overlay anymore.
+            //.addHeader("Accept", "multipart/mixed")
+            .build();
+        mDownloadBundleFromURLCall = Assertions.assertNotNull(mClient.newCall(request));
+        mDownloadBundleFromURLCall.enqueue(new Callback() {
+          @Override
+          public void onFailure(Call call, IOException e) {
+            // ignore callback if call was cancelled
+            if (mDownloadBundleFromURLCall == null || mDownloadBundleFromURLCall.isCanceled()) {
+              mDownloadBundleFromURLCall = null;
+              return;
+            }
+            mDownloadBundleFromURLCall = null;
+    
+            callback.onFailure(DebugServerException.makeGeneric(
+                "Could not connect to development server.",
+                "URL: " + call.request().url().toString(),
+                e));
+          }
+    
+          @Override
+          public void onResponse(Call call, final Response response) throws IOException {
+            // ignore callback if call was cancelled
+            if (mDownloadBundleFromURLCall == null || mDownloadBundleFromURLCall.isCanceled()) {
+              mDownloadBundleFromURLCall = null;
+              return;
+            }
+            mDownloadBundleFromURLCall = null;
+    
+            final String url = response.request().url().toString();
+    
+            //contentType为application/javascript
+            String contentType = response.header("content-type");
+            Pattern regex = Pattern.compile("multipart/mixed;.*boundary=\"([^\"]+)\"");
+            Matcher match = regex.matcher(contentType);
+            if (match.find()) {
+              String boundary = match.group(1);
+              MultipartStreamReader bodyReader = new MultipartStreamReader(response.body().source(), boundary);
+              boolean completed = bodyReader.readAllParts(new MultipartStreamReader.ChunkCallback() {
+                @Override
+                public void execute(Map<String, String> headers, Buffer body, boolean finished) throws IOException {
+                  // This will get executed for every chunk of the multipart response. The last chunk
+                  // (finished = true) will be the JS bundle, the other ones will be progress events
+                  // encoded as JSON.
+                  if (finished) {
+                    // The http status code for each separate chunk is in the X-Http-Status header.
+                    int status = response.code();
+                    if (headers.containsKey("X-Http-Status")) {
+                      status = Integer.parseInt(headers.get("X-Http-Status"));
+                    }
+                    processBundleResult(url, status, body, outputFile, callback);
+                  } else {
+                    if (!headers.containsKey("Content-Type") || !headers.get("Content-Type").equals("application/json")) {
+                      return;
+                    }
+                    try {
+                      JSONObject progress = new JSONObject(body.readUtf8());
+                      String status = null;
+                      if (progress.has("status")) {
+                        status = progress.getString("status");
+                      }
+                      Integer done = null;
+                      if (progress.has("done")) {
+                        done = progress.getInt("done");
+                      }
+                      Integer total = null;
+                      if (progress.has("total")) {
+                        total = progress.getInt("total");
+                      }
+                      callback.onProgress(status, done, total);
+                    } catch (JSONException e) {
+                      FLog.e(ReactConstants.TAG, "Error parsing progress JSON. " + e.toString());
+                    }
+                  }
+                }
+              });
+              if (!completed) {
+                callback.onFailure(new DebugServerException(
+                    "Error while reading multipart response.\n\nResponse code: " + response.code() + "\n\n" +
+                    "URL: " + call.request().url().toString() + "\n\n"));
+              }
+            } else {
+              // In case the server doesn't support multipart/mixed responses, fallback to normal download.
+              //如果服务器不支持multipart/mixed的responses，则利用Okio将返回内容即JS Bundle写入缓存
+              processBundleResult(url, response.code(), Okio.buffer(response.body().source()), outputFile, callback);
+            }
+          }
+        });
+      }
+}
+```
+我们先来看看这个方法的形参：
+
+- DevBundleDownloadListener callback：下载回调
+- File outputFile：Bundle缓存地址，通过new File(applicationContext.getFilesDir(), JS_BUNDLE_FILE_NAME)获取
+
+具体位置：/data/user/0/com.guoxiaoxing.vinci.demo/files/ReactNativeDevBundle.js
+
+- String bundleURL：Bundle地址
+
+可以看到内部使用Okhttp来处理下载任务，不管是Local Host还是真正的Server Host都统一处理。可以看到该方法将Response里返回的数据写入本地缓存，这样JS
+Bundle就算下载完成了，我们接着来看看下载完成后会继续做哪些事情。
+
+### 1.2 关键点2：
+
+```java
+public class DevSupportManagerImpl implements
+    DevSupportManager,
+    PackagerCommandListener,
+    DevInternalSettings.Listener {
+
+    public void reloadJSFromServer(final String bundleURL) {
+    mDevLoadingViewController.showForUrl(bundleURL);
+    mDevLoadingViewVisible = true;
+
+    mDevServerHelper.getBundleDownloader().downloadBundleFromURL(
+        new DevBundleDownloadListener() {
+          //Bundle下载成功
+          @Override
+          public void onSuccess() {
+            mDevLoadingViewController.hide();
+            mDevLoadingViewVisible = false;
+            if (mBundleDownloadListener != null) {
+              mBundleDownloadListener.onSuccess();
+            }
+            UiThreadUtil.runOnUiThread(
+                new Runnable() {
+                  @Override
+                  public void run() {
+                    mReactInstanceCommandsHandler.onJSBundleLoadedFromServer();
+                  }
+                });
+          }
+
+          @Override
+          public void onProgress(@Nullable final String status, @Nullable final Integer done, @Nullable final Integer total) {
+            mDevLoadingViewController.updateProgress(status, done, total);
+            if (mBundleDownloadListener != null) {
+              mBundleDownloadListener.onProgress(status, done, total);
+            }
+          }
+
+          @Override
+          public void onFailure(final Exception cause) {
+            mDevLoadingViewController.hide();
+            mDevLoadingViewVisible = false;
+            if (mBundleDownloadListener != null) {
+              mBundleDownloadListener.onFailure(cause);
+            }
+            FLog.e(ReactConstants.TAG, "Unable to download JS bundle", cause);
+            UiThreadUtil.runOnUiThread(
+                new Runnable() {
+                  @Override
+                  public void run() {
+                    if (cause instanceof DebugServerException) {
+                      DebugServerException debugServerException = (DebugServerException) cause;
+                      showNewJavaError(debugServerException.getMessage(), cause);
+                    } else {
+                      showNewJavaError(
+                          mApplicationContext.getString(R.string.catalyst_jsload_error),
+                          cause);
+                    }
+                  }
+                });
+          }
+        },
+        mJSBundleTempFile,
+        bundleURL);
+  }
+}      
+```
+
+我们知道DevSupportManager是在ReactInstanceManager创建时被创建的，具体如下：
+
+```
+mDevSupportManager = DevSupportManagerFactory.create(
+    applicationContext,
+    mDevInterface,
+    mJSMainModulePath,
+    useDeveloperSupport,
+    redBoxHandler,
+    devBundleDownloadListener,
+    minNumShakes);
+```
+因此mBundleDownloadListener是由开发者传递进来的，用来对Bundle的下载流程做一些额外的操作，这里的mBundleDownloadListener为空。mReactInstanceCommandsHandler
+在ReactInstanceManager内部创建，它调用的其实是ReactInstanceManager里的内部方法，如下：
+
+```java
+private final ReactInstanceDevCommandsHandler mDevInterface =
+    new ReactInstanceDevCommandsHandler() {
+
+      @Override
+      public void onReloadWithJSDebugger(JavaJSExecutor.Factory jsExecutorFactory) {
+        ReactInstanceManager.this.onReloadWithJSDebugger(jsExecutorFactory);
+      }
+
+      @Override
+      public void onJSBundleLoadedFromServer() {
+        ReactInstanceManager.this.onJSBundleLoadedFromServer();
+      }
+
+      @Override
+      public void toggleElementInspector() {
+        ReactInstanceManager.this.toggleElementInspector();
+      }
+    };
+```
+mReactInstanceCommandsHandler.onJSBundleLoadedFromServer()最终走到了JSBundleLoader createCachedBundleFromNetworkLoader()这个方法里，它用来创建
+对应的Bundle Loader来加载对应的Bundle。
+
+JSBundleLoader createCachedBundleFromNetworkLoader()又调用CatalystInstanceImpl里的方法来完成加载，当然最终的加载在C++层里完成。
+
+```java
+public class CatalystInstanceImpl implements CatalystInstance {
+
+ /* package */ void setSourceURLs(String deviceURL, String remoteURL) {
+    mSourceURL = deviceURL;
+    jniSetSourceURL(remoteURL);
+  }
+
+  /* package */ void loadScriptFromAssets(AssetManager assetManager, String assetURL, boolean loadSynchronously) {
+    mSourceURL = assetURL;
+    jniLoadScriptFromAssets(assetManager, assetURL, loadSynchronously);
+  }
+
+  /* package */ void loadScriptFromFile(String fileName, String sourceURL, boolean loadSynchronously) {
+    mSourceURL = sourceURL;
+    jniLoadScriptFromFile(fileName, sourceURL, loadSynchronously);
+  }
+
+  //从URL里加载
+  private native void jniSetSourceURL(String sourceURL);
+  //从Asset里加载
+  private native void jniLoadScriptFromAssets(AssetManager assetManager, String assetURL, boolean loadSynchronously);
+  //从文件里加载
+  private native void jniLoadScriptFromFile(String fileName, String sourceURL, boolean loadSynchronously);
+}
+```
+总共说来，分为三种加载方式：
+
+- 从URL里加载
+- 从Asset里加载
+- 从文件里加载
+
+## 二 JS的渲染流程
 
 在讲解渲染原理之前，我们先来看一个简单的例子。
 
@@ -73,37 +476,7 @@ AppRegistry.registerComponent('android_container', () => android_container);
 注：转换可以通过[babel](https://babeljs.io/repl/).
 
 ```javascript
-'use strict';
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
-
-var _react = require('react');
-
-var _react2 = _interopRequireDefault(_react);
-
-var _reactNative = require('react-native');
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
-
-function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
-
-function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; } /**
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            *
-var android_container = function (_Component) {
-  _inherits(android_container, _Component);
-
-  function android_container() {
-    _classCallCheck(this, android_container);
-
-    return _possibleConstructorReturn(this, (android_container.__proto__ || Object.getPrototypeOf(android_container)).apply(this, arguments));
-  }
-
+  ...
   _createClass(android_container, [{
     key: 'render',
     value: function render() {
@@ -130,32 +503,11 @@ var android_container = function (_Component) {
       );
     }
   }]);
-
   return android_container;
 }(_react.Component);
 
 exports.default = android_container;
-
-
-var styles = _reactNative.StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F5FCFF'
-  },
-  welcome: {
-    fontSize: 20,
-    textAlign: 'center',
-    margin: 10
-  },
-  instructions: {
-    textAlign: 'center',
-    color: '#333333',
-    marginBottom: 5
-  }
-});
-
+ ...
 _reactNative.AppRegistry.registerComponent('android_container', function () {
   return android_container;
 });
